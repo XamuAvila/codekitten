@@ -1,7 +1,7 @@
 ---
 id: v1-scaffolding-dry-run
 title: "v1: Project Scaffolding, Infrastructure & Dry Run"
-status: active
+status: done
 created: "2026-08-02"
 ---
 
