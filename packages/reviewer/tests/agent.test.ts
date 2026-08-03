@@ -254,6 +254,54 @@ describe("startAgent", () => {
     await agentPromise;
   });
 
+  it("dispatches stop command to onStop exactly once", async () => {
+    let capturedHandler: ((msg: any) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+      capturedHandler = handler;
+      return { unsubscribe: mockUnsubscribe };
+    });
+
+    const onStop = vi.fn().mockResolvedValue(undefined);
+    const agentPromise = startAgent({ ...baseConfig, onStop });
+    await vi.advanceTimersByTimeAsync(0);
+
+    capturedHandler!({
+      type: "follow_up",
+      payload: { message: "stop", sender: "alice" },
+      timestamp: "2026-08-03T00:00:00Z",
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onStop).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await agentPromise;
+  });
+
+  it("does not dispatch onStop for a regular follow-up question", async () => {
+    let capturedHandler: ((msg: any) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+      capturedHandler = handler;
+      return { unsubscribe: mockUnsubscribe };
+    });
+
+    const onStop = vi.fn().mockResolvedValue(undefined);
+    const agentPromise = startAgent({ ...baseConfig, onStop });
+    await vi.advanceTimersByTimeAsync(0);
+
+    capturedHandler!({
+      type: "follow_up",
+      payload: { message: "why?", sender: "alice" },
+      timestamp: "2026-08-03T00:00:00Z",
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onStop).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await agentPromise;
+  });
+
   it("matches force case-insensitively with surrounding whitespace", async () => {
     let capturedHandler: ((msg: any) => void) | undefined;
     mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
