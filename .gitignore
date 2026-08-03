@@ -6,8 +6,12 @@ coverage/
 /tmp/clones/
 
 # Local agent/tool config — holds API keys. A provider key was leaked from
-# .claude/settings.json in this repo's first push; never track this directory.
-.claude/
+# .claude/settings.json in this repo's first push; keep this directory out.
+.claude/*
+# Exception: the skills are part of the repo — AGENTS.md points at
+# .claude/skills/refine-task/ as the mandatory card-refinement standard.
+# Without this negation, adding a new skill would need `git add -f`.
+!.claude/skills/
 
 # Secrets — only the .example/template variants are ever committed
 *.pem
