@@ -1,13 +1,13 @@
 ---
 id: "KIT-013"
-status: "backlog"
+status: "done"
 priority: "high"
 assignee: ""
 epic: "v3-llm-integration"
 dueDate: null
 created: "2026-08-03"
 modified: "2026-08-03"
-completedAt: null
+completedAt: "2026-08-03"
 labels: ["github", "pr-comments"]
 order: "c3"
 ---

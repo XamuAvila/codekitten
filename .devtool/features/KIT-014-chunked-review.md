@@ -1,13 +1,13 @@
 ---
 id: "KIT-014"
-status: "backlog"
+status: "done"
 priority: "medium"
 assignee: ""
 epic: "v3-llm-integration"
 dueDate: null
 created: "2026-08-03"
 modified: "2026-08-03"
-completedAt: null
+completedAt: "2026-08-03"
 labels: ["llm", "chunking"]
 order: "c4"
 ---
