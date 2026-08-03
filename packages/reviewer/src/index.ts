@@ -74,6 +74,9 @@ async function main(): Promise<void> {
     jobId: config.jobId,
     redisUrl: config.redisUrl,
     idleTimeoutMs,
+    token: config.token,
+    repo: config.repo,
+    prNumber: config.prNumber,
   });
 }
 

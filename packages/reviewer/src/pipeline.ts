@@ -3,7 +3,8 @@ import { cloneRepo } from "./git/clone.js";
 import { generateDiff } from "./git/diff.js";
 import { fetchPrFiles } from "./git/files.js";
 import { dryRunAnalysis } from "./analyzer/dry-run.js";
-import type { PipelineConfig, PipelineResult, DryRunContext, FileCount } from "./types.js";
+import type { PipelineConfig, PipelineResult, DryRunContext, FileCount, ReviewCommentData } from "./types.js";
+import { postReviewComment } from "./github/comment.js";
 import fs from "node:fs";
 
 /**
@@ -62,6 +63,17 @@ export async function runPipeline(
     };
     const totalChars = clone.sizeBytes; // bytes ~ chars for text files
     const result = dryRunAnalysis(context, totalChars);
+
+    // 6. Post placeholder comment on PR (non-fatal)
+    const commentData: ReviewCommentData = {
+      repo: config.repo,
+      prNumber: config.prNumber,
+      fileCount: { total: fileCount.total, analyzed: fileCount.filtered, skipped: fileCount.skipped },
+      tokenEstimate: result.tokenEstimate,
+      model: result.model,
+      diff: { insertions: diff.insertions, deletions: diff.deletions },
+    };
+    await postReviewComment(config.token, config.repo, config.prNumber, commentData);
 
     const durationMs = Date.now() - start;
     console.log(`[reviewer] Job completed in ${(durationMs / 1000).toFixed(1)}s`);

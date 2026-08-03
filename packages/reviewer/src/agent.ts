@@ -2,6 +2,7 @@ import { Redis } from "ioredis";
 import type { PubSubMessage } from "@kitten/shared";
 import { subscribeToChannel } from "./redis/pubsub.js";
 import { reportStatus, incrementFollowUpCount } from "./redis/status.js";
+import { postFollowUpAck } from "./github/comment.js";
 
 const DEFAULT_IDLE_TIMEOUT_MS = 600_000; // 10 minutes
 
@@ -9,6 +10,9 @@ export interface AgentConfig {
   readonly jobId: string;
   readonly redisUrl: string;
   readonly idleTimeoutMs?: number;
+  readonly token?: string;
+  readonly repo?: string;
+  readonly prNumber?: number;
 }
 
 /**
@@ -81,6 +85,10 @@ export async function startAgent(config: AgentConfig): Promise<void> {
       const payload = msg.payload as { message: string; sender: string };
       console.log(`[reviewer] Follow-up received from ${payload.sender}: "${payload.message}"`);
       void incrementFollowUpCount(redis, jobId);
+      // Post ack comment on PR (non-fatal)
+      if (config.token && config.repo && config.prNumber) {
+        void postFollowUpAck(config.token, config.repo, config.prNumber, payload.message);
+      }
     } else if (msg.type === "shutdown") {
       console.log("[reviewer] Shutdown message received");
       void shutdown();
