@@ -108,6 +108,26 @@ describe("AnthropicAdapter", () => {
     expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 
+  it("disables thinking for the DeepSeek Anthropic endpoint (forced tool_choice)", async () => {
+    mockCreate.mockResolvedValue(toolUseResponse({ findings: [] }));
+    const adapter = new AnthropicAdapter({ apiKey: "dk-key", baseUrl: "https://api.deepseek.com/anthropic" });
+
+    await adapter.review(makeContext());
+
+    const [params] = mockCreate.mock.calls[0];
+    expect(params.reasoning).toEqual({ effort: "none" });
+  });
+
+  it("does not disable thinking for the real Anthropic endpoint", async () => {
+    mockCreate.mockResolvedValue(toolUseResponse({ findings: [] }));
+    const adapter = new AnthropicAdapter({ apiKey: "test-key", baseUrl: "https://api.anthropic.com" });
+
+    await adapter.review(makeContext());
+
+    const [params] = mockCreate.mock.calls[0];
+    expect(params.reasoning).toBeUndefined();
+  });
+
   it("throws when tool_use is missing from the response", async () => {
     mockCreate.mockResolvedValue({ content: [{ type: "text", text: "no tools here" }], usage: { input_tokens: 1, output_tokens: 1 } });
     const adapter = new AnthropicAdapter({ apiKey: "test-key", baseUrl: "https://api.anthropic.com" });

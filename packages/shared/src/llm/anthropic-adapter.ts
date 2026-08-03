@@ -25,10 +25,19 @@ const FINDINGS_TOOL_NAME = "report_findings";
 export class AnthropicAdapter implements LLMAdapter {
   private readonly client: Anthropic;
   private readonly defaultModel: string;
+  /**
+   * DeepSeek's Anthropic endpoint runs thinking mode by default and its
+   * thinking mode does NOT support forced tool_choice (400 error observed).
+   * Disable via reasoning.effort "none" — only for the DeepSeek base_url
+   * (api-docs.deepseek.com/guides/thinking_mode: Anthropic format reasoning
+   * effort none disables thinking mode).
+   */
+  private readonly disableThinking: boolean;
 
   constructor(opts: { readonly apiKey: string; readonly baseUrl: string; readonly defaultModel?: string }) {
     this.client = new Anthropic({ apiKey: opts.apiKey, baseURL: opts.baseUrl });
     this.defaultModel = opts.defaultModel ?? "deepseek-v4-flash";
+    this.disableThinking = opts.baseUrl === "https://api.deepseek.com/anthropic";
   }
 
   async review(context: ReviewContext): Promise<ReviewResult> {
@@ -48,6 +57,7 @@ export class AnthropicAdapter implements LLMAdapter {
         },
       ],
       tool_choice: { type: "tool", name: FINDINGS_TOOL_NAME },
+      ...(this.disableThinking ? { reasoning: { effort: "none" } } : {}),
     });
 
     const toolUse = response.content.find((block) => block.type === "tool_use");
@@ -74,6 +84,7 @@ export class AnthropicAdapter implements LLMAdapter {
       max_tokens: maxOutputTokens,
       system,
       messages: [{ role: "user", content: user }],
+      ...(this.disableThinking ? { reasoning: { effort: "none" } } : {}),
     });
 
     const text = response.content.find((block) => block.type === "text");
