@@ -198,7 +198,7 @@ describe("runPipeline", () => {
     expect(context.prompt.system).toMatch(/never commit/i);
   });
 
-  it("fails with LLM_OUTPUT_INVALID when adapter throws schema validation error", async () => {
+  it("fails with the schema validation error when the single chunk is invalid", async () => {
     mockReview.mockRejectedValue(new Error("Invalid findings from LLM: ..."));
     vi.useFakeTimers();
 
@@ -314,7 +314,7 @@ describe("runPipeline", () => {
     expect(result.error).toBeDefined();
   });
 
-  it("returns failed PipelineResult when the LLM call fails permanently", async () => {
+  it("fails the review when the LLM call fails permanently (single chunk)", async () => {
     vi.useFakeTimers();
     mockReview.mockRejectedValue(new Error("model unavailable"));
 
@@ -363,5 +363,95 @@ describe("runPipeline", () => {
     const result = await runPipeline(baseConfig);
 
     expect(result.status).toBe("completed");
+  });
+
+  it("makes a single LLM call when files fit the budget", async () => {
+    await runPipeline(baseConfig);
+
+    expect(mockReview).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes one LLM call per chunk when over the budget", async () => {
+    // Tiny budget + multiple files → multiple chunks
+    mockExistsSync.mockImplementation((path: unknown) => {
+      if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;
+      if (typeof path === "string" && (path.endsWith("src/app.ts") || path.endsWith("src/utils.ts"))) return true;
+      return false;
+    });
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (path.endsWith(".reviewer.yml")) return "reviewer:\n  max_context_tokens: 10\n";
+      if (path.endsWith("src/app.ts")) return "export const app = () => 1;";
+      return "export const util = () => 2;";
+    });
+    mockListFiles.mockResolvedValue({
+      data: [
+        { filename: "src/app.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+        { filename: "src/utils.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+      ],
+    });
+
+    mockReview.mockResolvedValue(llmReviewResult([]));
+
+    await runPipeline(baseConfig);
+
+    expect(mockReview.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("consolidates findings across chunks and dedupes by file:line", async () => {
+    // Tiny budget + multiple files → multiple chunks, each reporting the same finding
+    mockExistsSync.mockImplementation((path: unknown) => {
+      if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;
+      if (typeof path === "string" && (path.endsWith("src/app.ts") || path.endsWith("src/utils.ts"))) return true;
+      return false;
+    });
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (path.endsWith(".reviewer.yml")) return "reviewer:\n  max_context_tokens: 10\n";
+      if (path.endsWith("src/app.ts")) return "export const app = () => 1;";
+      return "export const util = () => 2;";
+    });
+    mockListFiles.mockResolvedValue({
+      data: [
+        { filename: "src/app.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+        { filename: "src/utils.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+      ],
+    });
+
+    mockReview.mockImplementation(async () => llmReviewResult([
+      { severity: "high", file: "src/app.ts", line: 1, finding: "Bug" },
+    ]));
+
+    const result = await runPipeline(baseConfig);
+
+    expect(mockReview.mock.calls.length).toBeGreaterThan(1);
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings![0].finding).toBe("Bug");
+  });
+
+  it("posts a budget question comment when over the budget", async () => {
+    mockExistsSync.mockImplementation((path: unknown) => {
+      if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;
+      if (typeof path === "string" && (path.endsWith("src/app.ts") || path.endsWith("src/utils.ts"))) return true;
+      return false;
+    });
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (path.endsWith(".reviewer.yml")) return "reviewer:\n  max_context_tokens: 10\n";
+      if (path.endsWith("src/app.ts")) return "export const app = () => 1;";
+      return "export const util = () => 2;";
+    });
+    mockListFiles.mockResolvedValue({
+      data: [
+        { filename: "src/app.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+        { filename: "src/utils.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+      ],
+    });
+
+    mockReview.mockResolvedValue(llmReviewResult([]));
+
+    await runPipeline(baseConfig);
+
+    expect(mockCreateComment).toHaveBeenCalled();
+    const bodies = mockCreateComment.mock.calls.map((c) => (c[0] as { body: string }).body);
+    expect(bodies.some((b) => b.match(/exceeds the token budget/i))).toBe(true);
+    expect(bodies.some((b) => b.match(/force/i))).toBe(true);
   });
 });
