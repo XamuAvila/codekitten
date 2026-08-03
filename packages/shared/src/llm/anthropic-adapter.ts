@@ -27,10 +27,11 @@ export class AnthropicAdapter implements LLMAdapter {
   private readonly defaultModel: string;
   /**
    * DeepSeek's Anthropic endpoint runs thinking mode by default and its
-   * thinking mode does NOT support forced tool_choice (400 error observed).
-   * Disable via reasoning.effort "none" — only for the DeepSeek base_url
-   * (api-docs.deepseek.com/guides/thinking_mode: Anthropic format reasoning
-   * effort none disables thinking mode).
+   * thinking mode does NOT support forced tool_choice (400 error observed
+   * in the real integration test). Disable via `thinking: { type:
+   * "disabled" }` — verified working against the real API (Aug 2026).
+   * The doc's `reasoning.effort "none"` hint does NOT work in practice.
+   * Only applied for the DeepSeek base_url.
    */
   private readonly disableThinking: boolean;
 
@@ -57,7 +58,7 @@ export class AnthropicAdapter implements LLMAdapter {
         },
       ],
       tool_choice: { type: "tool", name: FINDINGS_TOOL_NAME },
-      ...(this.disableThinking ? { reasoning: { effort: "none" } } : {}),
+      ...(this.disableThinking ? { thinking: { type: "disabled" } } : {}),
     });
 
     const toolUse = response.content.find((block) => block.type === "tool_use");
@@ -84,7 +85,7 @@ export class AnthropicAdapter implements LLMAdapter {
       max_tokens: maxOutputTokens,
       system,
       messages: [{ role: "user", content: user }],
-      ...(this.disableThinking ? { reasoning: { effort: "none" } } : {}),
+      ...(this.disableThinking ? { thinking: { type: "disabled" } } : {}),
     });
 
     const text = response.content.find((block) => block.type === "text");

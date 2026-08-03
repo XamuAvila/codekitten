@@ -115,7 +115,7 @@ describe("AnthropicAdapter", () => {
     await adapter.review(makeContext());
 
     const [params] = mockCreate.mock.calls[0];
-    expect(params.reasoning).toEqual({ effort: "none" });
+    expect(params.thinking).toEqual({ type: "disabled" });
   });
 
   it("does not disable thinking for the real Anthropic endpoint", async () => {
@@ -125,7 +125,7 @@ describe("AnthropicAdapter", () => {
     await adapter.review(makeContext());
 
     const [params] = mockCreate.mock.calls[0];
-    expect(params.reasoning).toBeUndefined();
+    expect(params.thinking).toBeUndefined();
   });
 
   it("throws when tool_use is missing from the response", async () => {
