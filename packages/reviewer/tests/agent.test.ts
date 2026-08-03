@@ -38,6 +38,13 @@ vi.mock("ioredis", () => {
   };
 });
 
+// --- Mock github/comment ---
+const mockPostFollowUpAck = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("../src/github/comment.js", () => ({
+  postFollowUpAck: (...args: unknown[]) => mockPostFollowUpAck(...args),
+}));
+
 // --- Mock process.exit ---
 const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {}) as any);
 
@@ -197,6 +204,78 @@ describe("startAgent", () => {
       "completed",
     );
     expect(mockExit).toHaveBeenCalledWith(0);
+  });
+
+  it("dispatches force command to onForce exactly once", async () => {
+    let capturedHandler: ((msg: any) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+      capturedHandler = handler;
+      return { unsubscribe: mockUnsubscribe };
+    });
+
+    const onForce = vi.fn().mockResolvedValue(undefined);
+    const agentPromise = startAgent({ ...baseConfig, onForce });
+    await vi.advanceTimersByTimeAsync(0);
+
+    capturedHandler!({
+      type: "follow_up",
+      payload: { message: "force", sender: "alice" },
+      timestamp: "2026-08-03T00:00:00Z",
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onForce).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await agentPromise;
+  });
+
+  it("does not dispatch onForce for a regular follow-up question", async () => {
+    let capturedHandler: ((msg: any) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+      capturedHandler = handler;
+      return { unsubscribe: mockUnsubscribe };
+    });
+
+    const onForce = vi.fn().mockResolvedValue(undefined);
+    const agentPromise = startAgent({ ...baseConfig, onForce });
+    await vi.advanceTimersByTimeAsync(0);
+
+    capturedHandler!({
+      type: "follow_up",
+      payload: { message: "explain the changes", sender: "alice" },
+      timestamp: "2026-08-03T00:00:00Z",
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onForce).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await agentPromise;
+  });
+
+  it("matches force case-insensitively with surrounding whitespace", async () => {
+    let capturedHandler: ((msg: any) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+      capturedHandler = handler;
+      return { unsubscribe: mockUnsubscribe };
+    });
+
+    const onForce = vi.fn().mockResolvedValue(undefined);
+    const agentPromise = startAgent({ ...baseConfig, onForce });
+    await vi.advanceTimersByTimeAsync(0);
+
+    capturedHandler!({
+      type: "follow_up",
+      payload: { message: "  FORCE  ", sender: "alice" },
+      timestamp: "2026-08-03T00:00:00Z",
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onForce).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await agentPromise;
   });
 
   it("handles SIGTERM gracefully", async () => {

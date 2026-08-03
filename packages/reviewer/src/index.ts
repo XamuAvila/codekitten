@@ -70,6 +70,19 @@ async function main(): Promise<void> {
     ? Number(process.env["POD_IDLE_TIMEOUT_MS"])
     : undefined;
 
+  // `force` re-runs the full review without the token budget (KIT-015).
+  // The pipeline re-clones (its finally always removes the clone dir) —
+  // accepted cost; correctness first.
+  const onForce = async (): Promise<void> => {
+    console.log("[reviewer] force received — re-running full review without budget");
+    try {
+      await runPipeline(config, { ignoreBudget: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[reviewer] Forced review failed: ${message}`);
+    }
+  };
+
   await startAgent({
     jobId: config.jobId,
     redisUrl: config.redisUrl,
@@ -77,6 +90,7 @@ async function main(): Promise<void> {
     token: config.token,
     repo: config.repo,
     prNumber: config.prNumber,
+    onForce,
   });
 }
 

@@ -13,6 +13,10 @@ export interface AgentConfig {
   readonly token?: string;
   readonly repo?: string;
   readonly prNumber?: number;
+  /** Invoked when a follow-up message equals "force" (KIT-015). */
+  readonly onForce?: () => Promise<void>;
+  /** Invoked when a follow-up message equals "stop" (KIT-016). */
+  readonly onStop?: () => Promise<void>;
 }
 
 /**
@@ -85,7 +89,18 @@ export async function startAgent(config: AgentConfig): Promise<void> {
       const payload = msg.payload as { message: string; sender: string };
       console.log(`[reviewer] Follow-up received from ${payload.sender}: "${payload.message}"`);
       void incrementFollowUpCount(redis, jobId);
-      // Post ack comment on PR (non-fatal)
+
+      const command = payload.message.trim().toLowerCase();
+      if (command === "force") {
+        if (config.onForce) void config.onForce();
+        return;
+      }
+      if (command === "stop") {
+        if (config.onStop) void config.onStop();
+        return;
+      }
+
+      // Post ack comment on PR (non-fatal) — real LLM answer in KIT-017
       if (config.token && config.repo && config.prNumber) {
         void postFollowUpAck(config.token, config.repo, config.prNumber, payload.message);
       }

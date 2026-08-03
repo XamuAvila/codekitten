@@ -427,6 +427,37 @@ describe("runPipeline", () => {
     expect(result.findings![0].finding).toBe("Bug");
   });
 
+  it("ignoreBudget skips chunking — single call with all files, no budget question", async () => {
+    // Over-budget setup
+    mockExistsSync.mockImplementation((path: unknown) => {
+      if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;
+      if (typeof path === "string" && (path.endsWith("src/app.ts") || path.endsWith("src/utils.ts"))) return true;
+      return false;
+    });
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (path.endsWith(".reviewer.yml")) return "reviewer:\n  max_context_tokens: 10\n";
+      if (path.endsWith("src/app.ts")) return "export const app = () => 1;";
+      return "export const util = () => 2;";
+    });
+    mockListFiles.mockResolvedValue({
+      data: [
+        { filename: "src/app.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+        { filename: "src/utils.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+      ],
+    });
+    mockReview.mockResolvedValue(llmReviewResult([]));
+
+    const result = await runPipeline(baseConfig, { ignoreBudget: true });
+
+    expect(mockReview).toHaveBeenCalledTimes(1);
+    const [context] = mockReview.mock.calls[0];
+    expect(context.files).toHaveLength(2); // all files in one call
+    // no budget question comment
+    const bodies = mockCreateComment.mock.calls.map((c) => (c[0] as { body: string }).body);
+    expect(bodies.some((b) => b.match(/exceeds the token budget/i))).toBe(false);
+    expect(result.status).toBe("completed");
+  });
+
   it("posts a budget question comment when over the budget", async () => {
     mockExistsSync.mockImplementation((path: unknown) => {
       if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;
