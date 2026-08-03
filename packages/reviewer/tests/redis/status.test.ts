@@ -54,6 +54,15 @@ describe("reportStatus", () => {
     expect(parsed.completedAt).toBeDefined();
   });
 
+  it("sets completedAt when status is cancelled", async () => {
+    await reportStatus(redis, "job-1", "cancelled");
+
+    const [, value] = (redis.set as ReturnType<typeof vi.fn>).mock.calls[0];
+    const parsed = JSON.parse(value);
+    expect(parsed.status).toBe("cancelled");
+    expect(parsed.completedAt).toBeDefined();
+  });
+
   it("merges with existing status data", async () => {
     const store = new Map<string, string>();
     store.set("review:job-1:status", JSON.stringify({

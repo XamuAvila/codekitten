@@ -4,8 +4,8 @@ import { FollowUpMessageSchema, AppError } from "@kitten/shared";
 import type { ReviewJobStatus, PubSubMessage } from "@kitten/shared";
 import { validate } from "../middleware/validation.js";
 
-/** Terminal statuses — a follow-up to a completed/failed job is rejected. */
-const TERMINAL_STATUSES = new Set(["completed", "failed"]);
+/** Terminal statuses — a follow-up to a completed/failed/cancelled job is rejected. */
+const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
 /**
  * POST /review/:jobId/message — publishes a follow-up message to the

@@ -6,7 +6,7 @@ import { z } from "zod";
  */
 export const ReviewJobStatusSchema = z.object({
   jobId: z.string().min(1),
-  status: z.enum(["queued", "running", "reviewing", "completed", "failed"]),
+  status: z.enum(["queued", "running", "reviewing", "completed", "failed", "cancelled"]),
   podName: z.string().min(1),
   createdAt: z.string().min(1),
   completedAt: z.string().optional(),

@@ -124,6 +124,28 @@ describe("POST /review/:jobId/message", () => {
     expect(res.body.code).toBe("NOT_FOUND");
   });
 
+  it("returns 404 for cancelled job", async () => {
+    const cancelledStatus: ReviewJobStatus = {
+      jobId: "review-org-repo-9",
+      status: "cancelled",
+      podName: "review-org-repo-9",
+      createdAt: "2026-08-03T00:00:00.000Z",
+      completedAt: "2026-08-03T01:00:00.000Z",
+      followUpCount: 0,
+    };
+    mockRedis._store.set(
+      "review:review-org-repo-9:status",
+      JSON.stringify(cancelledStatus),
+    );
+
+    const res = await request(buildApp(mockRedis))
+      .post("/review/review-org-repo-9/message")
+      .send({ message: "stop", sender: "user" });
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("NOT_FOUND");
+  });
+
   it("does not increment followUpCount — the Pod owns that counter", async () => {
     seedActiveJob(mockRedis, "review-org-repo-5");
 

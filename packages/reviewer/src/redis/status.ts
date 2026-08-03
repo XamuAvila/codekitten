@@ -10,7 +10,7 @@ function statusKey(jobId: string): string {
 }
 
 /** Terminal statuses that require setting completedAt. */
-const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "failed"]);
+const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "failed", "cancelled"]);
 
 /**
  * Update the status of a review job in Redis.
