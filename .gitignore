@@ -4,3 +4,13 @@ dist/
 coverage/
 .env
 /tmp/clones/
+
+# Local agent/tool config — holds API keys. A provider key was leaked from
+# .claude/settings.json in this repo's first push; never track this directory.
+.claude/
+
+# Secrets — only the .example/template variants are ever committed
+*.pem
+*.key
+.env.*
+!.env.example
