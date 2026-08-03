@@ -458,6 +458,40 @@ describe("runPipeline", () => {
     expect(result.status).toBe("completed");
   });
 
+  it("aborts remaining chunks when the signal is aborted", async () => {
+    // Over-budget setup with 2 files → 2 chunks
+    mockExistsSync.mockImplementation((path: unknown) => {
+      if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;
+      if (typeof path === "string" && (path.endsWith("src/app.ts") || path.endsWith("src/utils.ts"))) return true;
+      return false;
+    });
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (path.endsWith(".reviewer.yml")) return "reviewer:\n  max_context_tokens: 10\n";
+      if (path.endsWith("src/app.ts")) return "export const app = () => 1;";
+      return "export const util = () => 2;";
+    });
+    mockListFiles.mockResolvedValue({
+      data: [
+        { filename: "src/app.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+        { filename: "src/utils.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+      ],
+    });
+
+    let callCount = 0;
+    mockReview.mockImplementation(async () => {
+      callCount += 1;
+      return llmReviewResult([]);
+    });
+
+    const controller = new AbortController();
+    controller.abort(); // aborted before any call
+
+    const config = { ...baseConfig, signal: controller.signal };
+    await runPipeline(config);
+
+    expect(callCount).toBe(0);
+  });
+
   it("posts a budget question comment when over the budget", async () => {
     mockExistsSync.mockImplementation((path: unknown) => {
       if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;

@@ -104,6 +104,12 @@ export async function runPipeline(
 
     const results: Array<{ result?: ReviewResult; error?: Error }> = [];
     for (const [index, chunk] of chunks.entries()) {
+      // Stop command aborts between chunks (KIT-016) — remaining chunks skipped
+      if (config.signal?.aborted) {
+        console.log(`[reviewer] Review aborted by stop command — ${chunks.length - index} chunks skipped`);
+        break;
+      }
+
       const chunkContext: ReviewContext = {
         ...context,
         files: chunk.files,

@@ -43,6 +43,8 @@ export interface PipelineConfig {
   readonly token: string;
   readonly redisUrl: string;
   readonly skipPatterns: readonly string[];
+  /** Abort between chunks — stop command (KIT-016). */
+  readonly signal?: AbortSignal;
 }
 
 export interface PipelineResult {
