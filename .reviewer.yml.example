@@ -1,0 +1,14 @@
+# Sample .reviewer.yml — copy to the reviewed repo's root as .reviewer.yml
+reviewer:
+  language: en
+  model: claude-sonnet-5
+  max_tokens: 200000
+  trigger: "@reviewer"
+  blocking: comment_only
+  skip:
+    - "**/Migrations/**"
+    - "*.Designer.cs"
+    - "**/*.snap"
+    - "**/node_modules/**"
+  conventions_file: CLAUDE.md
+  rules: [] # custom rules are v2+

@@ -1,0 +1,16 @@
+# Docker Compose override for integration tests — isolated Redis on different port.
+services:
+  redis:
+    ports:
+      - "6382:6379"
+
+  dispatcher:
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - WEBHOOK_SECRET=test-secret
+    ports:
+      - "3002:3000"
+
+  worker:
+    environment:
+      - REDIS_URL=redis://redis:6379
