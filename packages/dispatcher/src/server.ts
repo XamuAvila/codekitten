@@ -3,21 +3,29 @@ import { Redis } from "ioredis";
 import { createHealthRouter } from "./routes/health.js";
 import { createReviewRouter } from "./routes/review.js";
 import { createStatusRouter } from "./routes/status.js";
+import { createMessageRouter } from "./routes/message.js";
 import { errorHandler } from "./middleware/error-handler.js";
-import { ReviewQueue } from "./queue/producer.js";
+import { K8sClient } from "./k8s/client.js";
+import type { PodConfig } from "./k8s/manifest.js";
 
-export function createApp(redisUrl: string): express.Express {
+export interface AppConfig {
+  readonly redisUrl: string;
+  readonly podConfig: PodConfig;
+}
+
+export function createApp(config: AppConfig): express.Express {
   const app = express();
-  const redis = new Redis(redisUrl, { lazyConnect: true });
-  const queue = new ReviewQueue(redisUrl);
+  const redis = new Redis(config.redisUrl, { lazyConnect: true });
+  const k8sClient = new K8sClient();
 
   // Body parsing
   app.use(express.json());
 
   // Routes
   app.use(createHealthRouter(redis));
-  app.use(createReviewRouter(queue));
-  app.use(createStatusRouter(queue));
+  app.use(createReviewRouter({ k8sClient, redis, podConfig: config.podConfig }));
+  app.use(createStatusRouter(redis));
+  app.use(createMessageRouter(redis));
 
   // Global error handler (must be last)
   app.use(errorHandler);

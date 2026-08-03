@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@kitten/shared": "workspace:*",
-    "bullmq": "^6.0.5",
+    "@kubernetes/client-node": "^1.4.0",
     "express": "^5.2.1",
     "ioredis": "^6.0.0"
   },

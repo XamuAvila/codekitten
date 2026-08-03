@@ -3,6 +3,6 @@
   "references": [
     { "path": "packages/shared" },
     { "path": "packages/dispatcher" },
-    { "path": "packages/worker" }
+    { "path": "packages/reviewer" }
   ]
 }

@@ -1,7 +1,7 @@
 /**
  * AppErrorCode — the only structured error codes used across the system.
  */
-export type AppErrorCode = "VALIDATION" | "NOT_FOUND" | "DUPLICATE";
+export type AppErrorCode = "VALIDATION" | "NOT_FOUND" | "DUPLICATE" | "SERVICE_UNAVAILABLE" | "AUTH_FAILED";
 
 export interface AppErrorDetail {
   readonly [key: string]: unknown;

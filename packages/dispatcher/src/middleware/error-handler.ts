@@ -45,6 +45,8 @@ function appErrorToHttp(code: string): number {
       return 404;
     case "DUPLICATE":
       return 409;
+    case "SERVICE_UNAVAILABLE":
+      return 503;
     default:
       return 500;
   }

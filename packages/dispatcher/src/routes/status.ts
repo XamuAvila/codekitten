@@ -1,11 +1,11 @@
 import { Router } from "express";
-import type { ReviewQueue } from "../queue/producer.js";
+import type { Redis } from "ioredis";
 import { AppError } from "@kitten/shared";
 
 /**
- * GET /status/:jobId — returns the current state of a review job.
+ * GET /status/:jobId — returns the current state of a review job from Redis.
  */
-export function createStatusRouter(queue: ReviewQueue): Router {
+export function createStatusRouter(redis: Redis): Router {
   const router = Router();
 
   router.get("/status/:jobId", async (req, res, next) => {
@@ -16,13 +16,14 @@ export function createStatusRouter(queue: ReviewQueue): Router {
         throw new AppError("VALIDATION", "Missing jobId parameter");
       }
 
-      const status = await queue.getStatus(jobId);
+      const raw = await redis.get(`review:${jobId}:status`);
 
-      if (status.status === "not_found") {
+      if (raw === null) {
         throw new AppError("NOT_FOUND", `Job ${jobId} not found`);
       }
 
-      res.json({ id: jobId, ...status });
+      const status = JSON.parse(raw);
+      res.json(status);
     } catch (err) {
       next(err);
     }

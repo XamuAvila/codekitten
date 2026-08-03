@@ -1,6 +1,23 @@
 {
   "name": "@kitten/reviewer",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kitten/shared": "workspace:*",
+    "@octokit/rest": "^22.0.0",
+    "ioredis": "^6.0.0",
+    "picomatch": "^4.0.5",
+    "simple-git": "^3.36.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "vitest": "^4.1.10"
+  }
 }

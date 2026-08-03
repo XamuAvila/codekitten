@@ -21,8 +21,8 @@ export default defineConfig({
       },
       {
         test: {
-          name: "worker",
-          root: "packages/worker",
+          name: "reviewer",
+          root: "packages/reviewer",
           include: ["tests/**/*.test.ts"],
           environment: "node",
         },

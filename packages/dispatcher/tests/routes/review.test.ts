@@ -1,99 +1,105 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
 import express from "express";
 import { createReviewRouter } from "../../src/routes/review.js";
-import { createStatusRouter } from "../../src/routes/status.js";
-import { createHealthRouter } from "../../src/routes/health.js";
 import { errorHandler } from "../../src/middleware/error-handler.js";
-import { ReviewQueue } from "../../src/queue/producer.js";
+import type { K8sClient } from "../../src/k8s/client.js";
+import type { PodConfig } from "../../src/k8s/manifest.js";
 
-const TEST_REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
-const TEST_QUEUE = `test-reviews-${Date.now()}`;
+function createMockK8sClient(): K8sClient {
+  return {
+    createPod: vi.fn().mockResolvedValue({}),
+    deletePod: vi.fn().mockResolvedValue(undefined),
+    getPod: vi.fn().mockResolvedValue({}),
+  } as unknown as K8sClient;
+}
 
-function buildApp(queue: ReviewQueue) {
+function createMockRedis() {
+  const store = new Map<string, string>();
+  return {
+    get: vi.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
+    set: vi.fn((key: string, value: string) => {
+      store.set(key, value);
+      return Promise.resolve("OK");
+    }),
+    _store: store,
+  } as unknown as import("ioredis").Redis;
+}
+
+const podConfig: PodConfig = {
+  namespace: "kitten",
+  image: "kitten-reviewer:latest",
+  idleTimeoutMs: 600000,
+  redisUrl: "redis://localhost:6379",
+};
+
+function buildApp(k8sClient: K8sClient, redis: ReturnType<typeof createMockRedis>) {
   const app = express();
   app.use(express.json());
-  // Mock redis for health route (not used in these tests but needed for wiring)
-  const redis = { ping: async () => "PONG" } as unknown as import("ioredis").Redis;
-  app.use(createHealthRouter(redis));
-  app.use(createReviewRouter(queue));
-  app.use(createStatusRouter(queue));
+  app.use(createReviewRouter({ k8sClient, redis, podConfig }));
   app.use(errorHandler);
   return app;
 }
 
 describe("POST /review", () => {
-  let queue: ReviewQueue;
+  let mockK8s: K8sClient;
+  let mockRedis: ReturnType<typeof createMockRedis>;
 
-  beforeEach(async () => {
-    queue = new ReviewQueue(TEST_REDIS_URL, { queueName: TEST_QUEUE });
-    await queue.connect();
+  beforeEach(() => {
+    mockK8s = createMockK8sClient();
+    mockRedis = createMockRedis();
   });
 
-  afterEach(async () => {
-    await queue.cleanAll();
-    await queue.close();
-  });
-
-  it("returns 202 with jobId for valid payload", async () => {
-    const res = await request(buildApp(queue))
+  it("creates K8s Pod and returns 202", async () => {
+    const res = await request(buildApp(mockK8s, mockRedis))
       .post("/review")
-      .send({ repo: "octocat/Hello-World", prNumber: 1, headRef: "main", baseRef: "main~1", sender: "test" });
+      .send({ repo: "octocat/Hello-World", prNumber: 1, headRef: "main", baseRef: "master", sender: "test" });
+
     expect(res.status).toBe(202);
-    expect(res.body.jobId).toBe("review-octocat-Hello-World-1");
+    expect(res.body.jobId).toBe("review-octocat-hello-world-1");
     expect(res.body.status).toBe("queued");
+    expect(mockK8s.createPod).toHaveBeenCalledOnce();
   });
 
-  it("returns 400 VALIDATION for missing repo", async () => {
-    const res = await request(buildApp(queue))
+  it("stores initial status in Redis", async () => {
+    await request(buildApp(mockK8s, mockRedis))
       .post("/review")
-      .send({ prNumber: 1, headRef: "main", baseRef: "main~1", sender: "test" });
+      .send({ repo: "octocat/Hello-World", prNumber: 1, headRef: "main", baseRef: "master", sender: "test" });
+
+    expect(mockRedis.set).toHaveBeenCalledOnce();
+    const [key, value] = (mockRedis.set as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(key).toBe("review:review-octocat-hello-world-1:status");
+    const status = JSON.parse(value);
+    expect(status.status).toBe("queued");
+    expect(status.followUpCount).toBe(0);
+  });
+
+  it("returns 503 when K8s API unavailable", async () => {
+    (mockK8s.createPod as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("K8s down"));
+
+    const res = await request(buildApp(mockK8s, mockRedis))
+      .post("/review")
+      .send({ repo: "org/repo", prNumber: 1, headRef: "main", baseRef: "master", sender: "test" });
+
+    expect(res.status).toBe(503);
+    expect(res.body.code).toBe("SERVICE_UNAVAILABLE");
+  });
+
+  it("returns 400 for invalid payload", async () => {
+    const res = await request(buildApp(mockK8s, mockRedis))
+      .post("/review")
+      .send({ prNumber: 1 });
+
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("VALIDATION");
   });
 
-  it("returns 400 VALIDATION for negative prNumber", async () => {
-    const res = await request(buildApp(queue))
+  it("returns 400 for negative prNumber", async () => {
+    const res = await request(buildApp(mockK8s, mockRedis))
       .post("/review")
-      .send({ repo: "org/repo", prNumber: -1, headRef: "main", baseRef: "main~1", sender: "test" });
+      .send({ repo: "org/repo", prNumber: -1, headRef: "main", baseRef: "master", sender: "test" });
+
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("VALIDATION");
-  });
-
-  it("defaults isReReview to false when omitted", async () => {
-    const res = await request(buildApp(queue))
-      .post("/review")
-      .send({ repo: "org/repo", prNumber: 5, headRef: "feat/x", baseRef: "main", sender: "dev" });
-    expect(res.status).toBe(202);
-    expect(res.body.jobId).toBe("review-org-repo-5");
-  });
-});
-
-describe("GET /status/:jobId", () => {
-  let queue: ReviewQueue;
-
-  beforeEach(async () => {
-    queue = new ReviewQueue(TEST_REDIS_URL, { queueName: TEST_QUEUE });
-    await queue.connect();
-  });
-
-  afterEach(async () => {
-    await queue.cleanAll();
-    await queue.close();
-  });
-
-  it("returns job state for queued job", async () => {
-    const jobId = await queue.enqueue({
-      repo: "org/repo", prNumber: 1, headRef: "main", baseRef: "main~1", sender: "test", isReReview: false,
-    });
-    const res = await request(buildApp(queue)).get(`/status/${jobId}`);
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBeDefined();
-  });
-
-  it("returns 404 for unknown job", async () => {
-    const res = await request(buildApp(queue)).get("/status/review-unknown-999");
-    expect(res.status).toBe(404);
-    expect(res.body.code).toBe("NOT_FOUND");
   });
 });

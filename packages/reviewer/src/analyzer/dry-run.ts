@@ -10,13 +10,13 @@ export function dryRunAnalysis(
 ): DryRunResult {
   const tokenEstimate = Math.ceil(totalChars / 4);
 
-  console.log(`[worker] Files in repo: ${context.fileCount.total}`);
-  console.log(`[worker] Files after skip patterns: ${context.fileCount.filtered}`);
+  console.log(`[reviewer] Files in PR: ${context.fileCount.total}`);
+  console.log(`[reviewer] Files after skip patterns: ${context.fileCount.filtered}`);
   if (context.fileCount.skipped > 0) {
-    console.log(`[worker] Skipped ${context.fileCount.skipped} files by pattern`);
+    console.log(`[reviewer] Skipped ${context.fileCount.skipped} files by pattern`);
   }
-  console.log(`[worker] DRY RUN — would send ${tokenEstimate}k tokens to ${context.config.model}`);
-  console.log("[worker] DRY RUN — would post PR comment with findings");
+  console.log(`[reviewer] DRY RUN — would send ${tokenEstimate}k tokens to ${context.config.model}`);
+  console.log("[reviewer] DRY RUN — would post PR comment with findings");
 
   return {
     dryRun: true,
