@@ -1,3 +1,9 @@
+# K8s-free fallback for quick iteration: dispatcher + Redis only.
+#
+# Reviews are NOT runnable here — the dispatcher creates reviewer Pods through
+# the Kubernetes API, so POST /review returns 503 SERVICE_UNAVAILABLE without a
+# cluster. Use this to iterate on routes, validation and health; use
+# ./scripts/minikube-setup.sh to run an actual review.
 services:
   redis:
     image: redis:7-alpine
@@ -13,26 +19,10 @@ services:
       context: .
       dockerfile: packages/dispatcher/Dockerfile
     ports:
-      - "3001:3000"
+      - "3001:3001"
     environment:
       - REDIS_URL=redis://redis:6379
-      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-dev-secret}
-      - PORT=3000
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  worker:
-    build:
-      context: .
-      dockerfile: packages/worker/Dockerfile
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-    volumes:
-      - /tmp/kitten-clones:/tmp/clones
+      - PORT=3001
     depends_on:
       redis:
         condition: service_healthy

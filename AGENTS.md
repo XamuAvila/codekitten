@@ -88,24 +88,45 @@ pnpm test
 # Lint
 pnpm lint
 
-# Start the full stack locally
-cp .env.example .env
+# --- Option A: dispatcher + Redis only (no K8s) ---
+# Fast loop for routes/validation/health. Reviews are NOT runnable here:
+# POST /review returns 503 because there is no Kubernetes API to create Pods.
 docker compose up -d --build
-
-# Verify the dispatcher is healthy
 curl http://localhost:3001/health
 # → {"status":"ok","redis":"connected"}
-
-# Check worker logs
-docker compose logs worker --tail 20
-# → [worker] Connected to Redis
-# → [worker] Listening for jobs on queue: reviews
-
-# Submit a review for dry-run testing (see US-004)
-curl -X POST http://localhost:3001/review \
-  -H "Content-Type: application/json" \
-  -d '{"repo":"octocat/Hello-World","prNumber":1,"headRef":"master","baseRef":"master","sender":"test"}'
-
-# Stop everything
 docker compose down
+
+# --- Option B: full stack on minikube (required to actually run a review) ---
+# Prerequisite: minikube >= 1.30. Seeds the Secret from $GITHUB_TOKEN when set.
+GITHUB_TOKEN=<token> ./scripts/minikube-setup.sh
+
+DISPATCHER_URL=$(minikube service kitten-dispatcher -n kitten --url)
+
+# Submit a review — creates a reviewer Pod
+curl -X POST "$DISPATCHER_URL/review" \
+  -H "Content-Type: application/json" \
+  -d '{"repo":"XamuAvila/kitten-test-repo","prNumber":1,"headRef":"test/add-feature","baseRef":"master","sender":"test"}'
+# → {"jobId":"review-xamuavila-kitten-test-repo-1","status":"queued"}
+
+# Watch the reviewer Pod
+kubectl --context=minikube logs review-xamuavila-kitten-test-repo-1 -n kitten
+# → [reviewer] Clone complete / Diff: N files changed / DRY RUN — would send Xk tokens
+
+# Poll status: queued → running → reviewing → completed
+curl "$DISPATCHER_URL/status/review-xamuavila-kitten-test-repo-1"
+
+# Send a follow-up to the live Pod (resets its idle timer)
+curl -X POST "$DISPATCHER_URL/review/review-xamuavila-kitten-test-repo-1/message" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"explain the changes","sender":"dev"}'
+
+# Full lifecycle check (submit → comment → follow-up → idle shutdown)
+IDLE_TIMEOUT=30 ./scripts/e2e-test.sh
+
+# Remove finished reviewer Pods
+./scripts/cleanup-pods.sh
 ```
+
+**Always pass `--context=minikube` to `kubectl`.** The scripts do this internally;
+do it by hand too. A developer kubeconfig may point at a production cluster, and
+these commands create namespaces, RBAC and Secrets.

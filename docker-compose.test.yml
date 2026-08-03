@@ -7,10 +7,6 @@ services:
   dispatcher:
     environment:
       - REDIS_URL=redis://redis:6379
-      - WEBHOOK_SECRET=test-secret
+      - PORT=3001
     ports:
-      - "3002:3000"
-
-  worker:
-    environment:
-      - REDIS_URL=redis://redis:6379
+      - "3002:3001"
