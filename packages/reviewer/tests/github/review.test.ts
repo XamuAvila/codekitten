@@ -69,6 +69,7 @@ describe("postPrReview", () => {
 
     const [params] = mockCreateReview.mock.calls[0];
     expect(params.state).toBe("COMMENTED");
+    expect(params.event).toBe("COMMENT"); // without event the review stays PENDING
     expect(params.body).toContain("**Actionable comments posted: 1**");
     expect(params.body).toContain("| Severity");
     expect(params.body).toContain("Off diff");

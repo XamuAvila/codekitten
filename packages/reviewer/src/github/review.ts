@@ -94,6 +94,9 @@ export async function postPrReview(
     repo: repoName,
     pull_number: prNumber,
     state: "COMMENTED",
+    // Without `event` the review is created PENDING — never submitted, and
+    // its inline comments stay invisible until someone submits it.
+    event: "COMMENT",
     body,
     comments: inlineComments,
   });
