@@ -1,4 +1,4 @@
-import type { ReviewerConfig } from "@kitten/shared";
+import type { Finding, ReviewerConfig } from "@kitten/shared";
 
 export interface CloneResult {
   readonly dir: string;
@@ -47,8 +47,12 @@ export interface PipelineConfig {
 
 export interface PipelineResult {
   readonly status: "completed" | "failed";
+  /** false = real LLM review (v3); kept for interface compatibility. */
   readonly dryRun: boolean;
   readonly diff?: DiffResult;
+  readonly findings?: readonly Finding[];
+  /** Built guardrailed prompt — KIT-017 reuses it for follow-up context. */
+  readonly prompt?: { readonly system: string; readonly user: string };
   readonly error?: string;
   readonly metadata: {
     readonly repo: string;
@@ -64,6 +68,8 @@ export interface ReviewCommentData {
   readonly tokenEstimate: number;
   readonly model: string;
   readonly diff: { readonly insertions: number; readonly deletions: number };
+  /** Pre-formatted findings body (v3). When present, it replaces the dry-run summary. */
+  readonly findingsBody?: string;
 }
 
 export interface PrMetadata {

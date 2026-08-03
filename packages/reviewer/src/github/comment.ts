@@ -1,4 +1,5 @@
 import { Octokit } from "@octokit/rest";
+import type { Finding } from "@kitten/shared";
 import type { ReviewCommentData } from "../types.js";
 
 /**
@@ -67,10 +68,15 @@ export async function postFollowUpAck(
 }
 
 /**
- * Formats the initial review comment body using the dry-run summary data.
- * Includes [KITTEN-TEST] prefix for test fixture identification.
+ * Formats the initial review comment body.
+ * With `findingsBody` (v3) the body is the findings table; without it, the
+ * dry-run summary (v2) is used. Includes [KITTEN-TEST] prefix.
  */
 function formatReviewComment(summary: ReviewCommentData): string {
+  if (summary.findingsBody) {
+    return summary.findingsBody;
+  }
+
   const { repo, prNumber, fileCount, tokenEstimate, model, diff } = summary;
   const tokensK = (tokenEstimate / 1000).toFixed(1);
 
@@ -88,6 +94,47 @@ function formatReviewComment(summary: ReviewCommentData): string {
     `- Diff: +${diff.insertions} -${diff.deletions}`,
     ``,
     `> This is a dry-run review (v2). Real LLM analysis coming in v3.`,
+  ].join("\n");
+}
+
+/**
+ * Formats the review comment body with real findings (v3).
+ * Markdown table: severity | file:line | finding | suggestion.
+ * Includes [KITTEN-TEST] prefix for test fixture identification.
+ */
+export function formatFindingsComment(
+  findings: readonly Finding[],
+  meta: {
+    readonly repo: string;
+    readonly prNumber: number;
+    readonly model: string;
+    readonly inputTokens: number;
+    readonly outputTokens: number;
+    readonly insertions: number;
+    readonly deletions: number;
+  },
+): string {
+  const rows = findings.map((f) => {
+    const location = `${f.file}:${f.line}`;
+    const suggestion = f.suggestion ? f.suggestion.replace(/\n/g, " ") : "-";
+    return `| ${f.severity} | ${location} | ${f.finding} | ${suggestion} |`;
+  });
+
+  return [
+    `🐱 **Kitten Review** [KITTEN-TEST]`,
+    ``,
+    `**Repo:** ${meta.repo} | **PR:** #${meta.prNumber} | **Findings:** ${findings.length}`,
+    ``,
+    `---`,
+    ``,
+    `## Findings`,
+    ``,
+    `| Severity | File:Line | Finding | Suggestion |`,
+    `|---|---|---|---|`,
+    ...rows,
+    ``,
+    `> Model: ${meta.model} · +${meta.insertions} -${meta.deletions} · ` +
+      `${meta.inputTokens} in / ${meta.outputTokens} out tokens`,
   ].join("\n");
 }
 
