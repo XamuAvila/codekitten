@@ -1,6 +1,6 @@
 ---
 id: "KIT-003"
-status: "backlog"
+status: "done"
 priority: "high"
 assignee: ""
 epic: "v1-scaffolding-dry-run"
