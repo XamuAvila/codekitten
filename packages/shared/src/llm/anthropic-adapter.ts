@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { Finding, ReviewContext, ReviewResult } from "../types/index.js";
+import type { Finding, ReviewResult } from "../types/index.js";
 import { FindingSchema } from "../types/index.js";
-import type { LLMAdapter } from "./adapter.js";
+import type { LLMAdapter, ReviewContext, ReviewFile } from "./adapter.js";
 
 /**
  * The tool the model must call with its findings. The input_schema mirrors
@@ -91,7 +91,7 @@ const FALLBACK_SYSTEM = [
 
 function fallbackUserContent(context: ReviewContext): string {
   const files = context.files
-    .map((f) => `### ${f.path}\n\`\`\`\n${f.content}\n\`\`\``)
+    .map((f: ReviewFile) => `### ${f.path}\n\`\`\`\n${f.content}\n\`\`\``)
     .join("\n\n");
   return `Pull request diff:\n${context.diff ?? ""}\n\nChanged files:\n${files}`;
 }
@@ -109,7 +109,20 @@ function parseFindings(input: unknown): readonly Finding[] {
   return result.data;
 }
 
-const FINDINGS_INPUT_SCHEMA = {
+const FINDINGS_INPUT_SCHEMA: {
+  readonly type: "object";
+  readonly properties: {
+    readonly findings: {
+      readonly type: "array";
+      readonly items: {
+        readonly type: "object";
+        readonly properties: Record<string, unknown>;
+        readonly required: string[];
+      };
+    };
+  };
+  readonly required: string[];
+} = {
   type: "object",
   properties: {
     findings: {
@@ -129,4 +142,4 @@ const FINDINGS_INPUT_SCHEMA = {
     },
   },
   required: ["findings"],
-} as const;
+};
