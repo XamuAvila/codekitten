@@ -50,6 +50,7 @@ export function buildPodManifest(request: ReviewJob, config: PodConfig): V1Pod {
         {
           name: "reviewer",
           image: config.image,
+          imagePullPolicy: "IfNotPresent",
           env: [
             { name: "REVIEW_JOB_ID", value: podName },
             { name: "REVIEW_REPO", value: request.repo },

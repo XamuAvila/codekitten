@@ -1,13 +1,13 @@
 ---
 id: "KIT-010"
-status: "backlog"
+status: "done"
 priority: "medium"
 assignee: ""
 epic: "v2-github-integration"
 dueDate: null
 created: "2026-08-03"
 modified: "2026-08-03"
-completedAt: null
+completedAt: "2026-08-03"
 labels: ["e2e", "integration"]
 order: "b5"
 ---

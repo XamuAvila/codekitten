@@ -53,15 +53,9 @@ export function createMessageRouter(redis: Redis): Router {
           JSON.stringify(pubSubMessage),
         );
 
-        // Increment follow-up count in status
-        const updatedStatus: ReviewJobStatus = {
-          ...status,
-          followUpCount: status.followUpCount + 1,
-        };
-        await redis.set(
-          `review:${jobId}:status`,
-          JSON.stringify(updatedStatus),
-        );
+        // followUpCount is incremented by the Pod when it actually receives
+        // the message — the dispatcher publishes fire-and-forget and cannot
+        // know whether a live Pod consumed it.
 
         res.json({ status: "sent" });
       } catch (err) {

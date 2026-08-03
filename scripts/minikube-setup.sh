@@ -13,6 +13,11 @@ success() { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
+# Every kubectl call pins --context=minikube. Never rely on the ambient current
+# context: a developer's kubeconfig may point at a production cluster, and this
+# script creates namespaces, RBAC and secrets.
+K="kubectl --context=minikube"
+
 # ─── Resolve project root (script lives in <root>/scripts/) ──────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -32,7 +37,7 @@ fi
 success "minikube v${MINIKUBE_VERSION} detected"
 
 # ─── 2. Start minikube if not running ────────────────────────────────────────
-if minikube status --format='{{.Host}}' 2>/dev/null | grep -q "Running"; then
+if minikube status --format='{{.APIServer}}' 2>/dev/null | grep -q "Running"; then
   success "minikube is already running"
 else
   info "Starting minikube with docker driver..."
@@ -40,50 +45,65 @@ else
   success "minikube started"
 fi
 
-# ─── 3. Enable DNS addon ────────────────────────────────────────────────────
-info "Enabling DNS addon..."
-minikube addons enable dns
-success "DNS addon enabled"
-
-# ─── 4. Apply namespace ─────────────────────────────────────────────────────
+# ─── 3. Apply namespace ─────────────────────────────────────────────────────
 info "Applying namespace..."
-kubectl apply -f "${PROJECT_ROOT}/k8s/namespace.yaml"
+${K} apply -f "${PROJECT_ROOT}/k8s/namespace.yaml"
 success "Namespace 'kitten' applied"
 
-# ─── 5. Apply secret ────────────────────────────────────────────────────────
-info "Applying secret..."
-kubectl apply -f "${PROJECT_ROOT}/k8s/secret.yaml"
-warn "Secret uses placeholder token — replace before real usage"
-success "Secret 'kitten-github-token' applied"
+# ─── 4. Apply RBAC (dispatcher needs to create Pods) ────────────────────────
+# Without this the dispatcher gets HTTP 403 from the K8s API:
+#   "pods is forbidden: User system:serviceaccount:kitten:default cannot create
+#    resource pods in the namespace kitten"
+info "Applying RBAC (Role + RoleBinding for Pod management)..."
+${K} apply -f "${PROJECT_ROOT}/k8s/rbac.yaml"
+success "RBAC applied"
+
+# ─── 5. Apply GitHub token secret ───────────────────────────────────────────
+# If GITHUB_TOKEN is exported, create the secret from it. Otherwise apply the
+# placeholder template so the manifests are complete but non-functional.
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  info "Creating secret from \$GITHUB_TOKEN..."
+  ${K} create secret generic kitten-github-token \
+    --from-literal=token="${GITHUB_TOKEN}" \
+    -n kitten --dry-run=client -o yaml | ${K} apply -f -
+  success "Secret 'kitten-github-token' created from environment"
+else
+  info "Applying placeholder secret..."
+  ${K} apply -f "${PROJECT_ROOT}/k8s/secret.yaml"
+  warn "Secret holds the placeholder REPLACE_ME — reviews will fail to clone."
+  warn "Re-run with: GITHUB_TOKEN=<your-token> ./scripts/minikube-setup.sh"
+fi
 
 # ─── 6. Apply Redis deployment + service ─────────────────────────────────────
 info "Applying Redis deployment and service..."
-kubectl apply -f "${PROJECT_ROOT}/k8s/redis-deployment.yaml"
-kubectl apply -f "${PROJECT_ROOT}/k8s/redis-service.yaml"
+${K} apply -f "${PROJECT_ROOT}/k8s/redis-deployment.yaml"
+${K} apply -f "${PROJECT_ROOT}/k8s/redis-service.yaml"
 success "Redis deployment and service applied"
 
-# ─── 7. Build dispatcher image ──────────────────────────────────────────────
+# ─── 7. Build images inside minikube's docker daemon ────────────────────────
+# minikube has its own docker daemon; images built on the host are not visible
+# to the cluster. Pods use imagePullPolicy: IfNotPresent against this daemon.
 info "Building dispatcher image inside minikube..."
 minikube image build -t kitten-dispatcher:latest -f "${PROJECT_ROOT}/packages/dispatcher/Dockerfile" "${PROJECT_ROOT}"
 success "Dispatcher image built"
 
-# ─── 8. Build reviewer image ────────────────────────────────────────────────
 info "Building reviewer image inside minikube..."
 minikube image build -t kitten-reviewer:latest -f "${PROJECT_ROOT}/packages/reviewer/Dockerfile" "${PROJECT_ROOT}"
 success "Reviewer image built"
 
-# ─── 9. Apply dispatcher deployment + service ───────────────────────────────
+# ─── 8. Apply dispatcher deployment + service ───────────────────────────────
 info "Applying dispatcher deployment and service..."
-kubectl apply -f "${PROJECT_ROOT}/k8s/dispatcher-deployment.yaml"
-kubectl apply -f "${PROJECT_ROOT}/k8s/dispatcher-service.yaml"
+${K} apply -f "${PROJECT_ROOT}/k8s/dispatcher-deployment.yaml"
+${K} apply -f "${PROJECT_ROOT}/k8s/dispatcher-service.yaml"
+${K} rollout restart deployment/kitten-dispatcher -n kitten
 success "Dispatcher deployment and service applied"
 
-# ─── 10. Wait for rollout ───────────────────────────────────────────────────
+# ─── 9. Wait for rollout ────────────────────────────────────────────────────
 info "Waiting for dispatcher rollout (timeout: 120s)..."
-kubectl rollout status deployment/kitten-dispatcher -n kitten --timeout=120s
+${K} rollout status deployment/kitten-dispatcher -n kitten --timeout=120s
 success "Dispatcher rollout complete"
 
-# ─── 11. Print summary ──────────────────────────────────────────────────────
+# ─── 10. Print summary ──────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}  Kitten K8s infrastructure is ready!${NC}"
@@ -91,12 +111,12 @@ echo -e "${GREEN}═════════════════════
 echo ""
 echo "  Namespace:  kitten"
 echo "  Pods:"
-kubectl get pods -n kitten --no-headers | while read -r line; do
+${K} get pods -n kitten --no-headers | while read -r line; do
   echo "    ${line}"
 done
 echo ""
 echo "  Services:"
-kubectl get svc -n kitten --no-headers | while read -r line; do
+${K} get svc -n kitten --no-headers | while read -r line; do
   echo "    ${line}"
 done
 echo ""
@@ -104,5 +124,5 @@ echo ""
 DISPATCHER_URL="$(minikube service kitten-dispatcher -n kitten --url 2>/dev/null || echo 'N/A')"
 echo -e "  Dispatcher URL: ${BLUE}${DISPATCHER_URL}${NC}"
 echo -e "  Health check:   ${BLUE}curl ${DISPATCHER_URL}/health${NC}"
+echo -e "  Run E2E:        ${BLUE}IDLE_TIMEOUT=30 ./scripts/e2e-test.sh${NC}"
 echo ""
-warn "Remember to replace the placeholder token in k8s/secret.yaml before submitting real reviews."

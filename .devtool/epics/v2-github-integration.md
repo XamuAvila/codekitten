@@ -1,7 +1,7 @@
 ---
 id: v2-github-integration
 title: "v2: GitHub Integration"
-status: draft
+status: done
 created: "2026-08-03"
 ---
 
@@ -74,12 +74,12 @@ No LLM calls in v2 — the review output is still a dry-run log, and follow-up r
 
 | Card | Story | Scope |
 |---|---|---|
-| KIT-005 | US-005 | K8s infrastructure: minikube setup, namespace, Redis + dispatcher manifests, image build |
-| KIT-006 | US-006 | Dispatcher: replace BullMQ with K8s Pod creation, add POST /review/:jobId/message |
-| KIT-007 | US-007 | Reviewer package: clone with auth, real diff, PR files fetch, dry-run |
-| KIT-008 | US-008 | Agent lifecycle: Redis pub/sub, follow-up message handling, idle timeout, status reporting |
-| KIT-009 | US-009 | GitHub API: PR comment posting (placeholder review + follow-up ack) |
-| KIT-010 | US-010 | End-to-end: POST /review → Pod runs → comment posted → follow-up → idle → Pod dies |
+| [KIT-005](../features/done/KIT-005-k8s-infrastructure.md) | [US-005](../../docs/stories/US-005-k8s-infrastructure.md) | K8s infrastructure: minikube setup, namespace, RBAC, Redis + dispatcher manifests, image build |
+| [KIT-006](../features/done/KIT-006-dispatcher-pod-creation.md) | [US-006](../../docs/stories/US-006-dispatcher-pod-orchestration.md) | Dispatcher: replace BullMQ with K8s Pod creation, add POST /review/:jobId/message |
+| [KIT-007](../features/done/KIT-007-reviewer-pipeline.md) | [US-007](../../docs/stories/US-007-authenticated-review-pipeline.md) | Reviewer package: clone with auth, real diff, PR files fetch, dry-run |
+| [KIT-008](../features/KIT-008-agent-lifecycle.md) | [US-008](../../docs/stories/US-008-agent-lifecycle.md) | Agent lifecycle: Redis pub/sub, follow-up message handling, idle timeout, status reporting |
+| [KIT-009](../features/KIT-009-pr-comment-posting.md) | [US-009](../../docs/stories/US-009-pr-comment-posting.md) | GitHub API: PR comment posting (placeholder review + follow-up ack) |
+| [KIT-010](../features/KIT-010-e2e-review-flow.md) | [US-010](../../docs/stories/US-010-e2e-review-flow.md) | End-to-end: POST /review → Pod runs → comment posted → follow-up → idle → Pod dies |
 
 ## Architecture Decisions
 
@@ -131,6 +131,22 @@ No `POST /webhook/github` in v2. GitHub webhook for PR comments (automatic follo
 - Faster deliverable — webhook + signature validation is its own feature.
 - `POST /review/:jobId/message` proves the pub/sub + agent lifecycle without webhook complexity.
 - Future webhook handler just translates PR comment events into calls to `/review/:jobId/message`.
+
+### RBAC for Pod creation (discovered during implementation)
+
+**Decision:** The `kitten` namespace ships a Role + RoleBinding (`k8s/rbac.yaml`) granting the `default` ServiceAccount `create/delete/get/list/watch` on Pods.
+
+**Rationale:**
+- Without it the dispatcher gets HTTP 403 from the K8s API: `pods is forbidden: User "system:serviceaccount:kitten:default" cannot create resource "pods"`. This is not optional — Pod creation is the dispatcher's whole job.
+- Scoped to a namespaced Role (not ClusterRole) and to Pods only — the dispatcher never needs cluster-wide or cross-resource access.
+
+### followUpCount is owned by the Pod, not the dispatcher
+
+**Decision:** Only the reviewer Pod increments `followUpCount`, when it actually consumes a message from the channel. The dispatcher publishes and returns without touching the counter.
+
+**Rationale:**
+- The dispatcher publishes fire-and-forget; it cannot know whether a live Pod consumed the message. Incrementing on publish counts messages that were never processed.
+- Having both increment double-counts every follow-up (observed in the first E2E run: one message produced `followUpCount: 2`). `scripts/e2e-test.sh` now asserts exactly 1 to catch the regression.
 
 ### GitHub token via K8s Secret
 

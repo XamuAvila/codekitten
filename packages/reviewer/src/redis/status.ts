@@ -2,7 +2,8 @@ import type { Redis } from "ioredis";
 import type { ReviewJobStatus } from "@kitten/shared";
 
 /**
- * Redis key pattern for review job status hashes.
+ * Redis key pattern for review job status.
+ * Stored as JSON string (same format as dispatcher).
  */
 function statusKey(jobId: string): string {
   return `review:${jobId}:status`;
@@ -12,8 +13,9 @@ function statusKey(jobId: string): string {
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["completed", "failed"]);
 
 /**
- * Update the status field of a review job in Redis.
- * For terminal statuses (completed, failed), also sets completedAt to current ISO timestamp.
+ * Update the status of a review job in Redis.
+ * Reads current status, merges the new status field, writes back.
+ * For terminal statuses, also sets completedAt.
  */
 export async function reportStatus(
   redis: Redis,
@@ -21,46 +23,48 @@ export async function reportStatus(
   status: ReviewJobStatus["status"],
 ): Promise<void> {
   const key = statusKey(jobId);
-  await redis.hset(key, "status", status);
+  const raw = await redis.get(key);
+  const current: Partial<ReviewJobStatus> = raw ? JSON.parse(raw) : { jobId, podName: jobId, createdAt: new Date().toISOString(), followUpCount: 0 };
 
-  if (TERMINAL_STATUSES.has(status)) {
-    await redis.hset(key, "completedAt", new Date().toISOString());
-  }
+  const updated = {
+    ...current,
+    status,
+    ...(TERMINAL_STATUSES.has(status) ? { completedAt: new Date().toISOString() } : {}),
+  };
+
+  await redis.set(key, JSON.stringify(updated));
 }
 
 /**
- * Atomically increment the followUpCount field for a review job.
- * Returns the new count after increment.
+ * Increment the followUpCount for a review job.
+ * Reads current status, increments, writes back.
  */
 export async function incrementFollowUpCount(
   redis: Redis,
   jobId: string,
 ): Promise<number> {
-  return redis.hincrby(statusKey(jobId), "followUpCount", 1);
+  const key = statusKey(jobId);
+  const raw = await redis.get(key);
+
+  if (!raw) return 0;
+
+  const current: ReviewJobStatus = JSON.parse(raw);
+  const newCount = current.followUpCount + 1;
+  const updated = { ...current, followUpCount: newCount };
+  await redis.set(key, JSON.stringify(updated));
+
+  return newCount;
 }
 
 /**
- * Fetch the full status hash for a review job.
- * Returns null if the key does not exist (empty hash from HGETALL).
+ * Fetch the full status for a review job.
+ * Returns null if the key does not exist.
  */
 export async function getStatus(
   redis: Redis,
   jobId: string,
 ): Promise<ReviewJobStatus | null> {
-  const data = await redis.hgetall(statusKey(jobId));
-
-  // ioredis HGETALL returns {} for missing keys
-  if (!data || Object.keys(data).length === 0) {
-    return null;
-  }
-
-  return {
-    jobId: data["jobId"] ?? jobId,
-    status: data["status"] as ReviewJobStatus["status"],
-    podName: data["podName"] ?? "",
-    createdAt: data["createdAt"] ?? "",
-    completedAt: data["completedAt"],
-    durationMs: data["durationMs"] ? Number(data["durationMs"]) : undefined,
-    followUpCount: Number(data["followUpCount"] ?? 0),
-  };
+  const raw = await redis.get(statusKey(jobId));
+  if (!raw) return null;
+  return JSON.parse(raw);
 }

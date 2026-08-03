@@ -22,11 +22,10 @@ describe("cloneRepo", () => {
     expect(mockGit.clone).toHaveBeenCalledWith(
       "https://x-access-token:test-token-123@github.com/owner/repo.git",
       "/tmp/test-clone",
-      expect.any(Object),
     );
   });
 
-  it("passes --depth=1 and --branch options", async () => {
+  it("passes clone options without depth restriction", async () => {
     mockGit.clone.mockResolvedValueOnce(undefined);
 
     await cloneRepo("owner/repo", "feat/x", "/tmp/test-clone", "tok");
@@ -34,7 +33,6 @@ describe("cloneRepo", () => {
     expect(mockGit.clone).toHaveBeenCalledWith(
       expect.any(String),
       "/tmp/test-clone",
-      { "--depth": "1", "--branch": "feat/x" },
     );
   });
 

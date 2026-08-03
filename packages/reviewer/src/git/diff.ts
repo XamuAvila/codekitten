@@ -16,14 +16,10 @@ export async function generateDiff(
   const git = simpleGit(repoDir);
 
   try {
-    // Fetch base ref — shallow clone only has headRef
-    await git.fetch(["origin", baseRef, "--depth=1"]);
-
-    // Get raw unified diff (three-dot: changes introduced by headRef since divergence)
-    const raw = await git.diff([`origin/${baseRef}...${headRef}`]);
-
-    // Get structured stats
-    const summary = await git.diffSummary([`origin/${baseRef}...${headRef}`]);
+    // Full clone — use origin refs for comparison
+    const diffSpec = `origin/${baseRef}...origin/${headRef}`;
+    const raw = await git.diff([diffSpec]);
+    const summary = await git.diffSummary([diffSpec]);
 
     return {
       raw,

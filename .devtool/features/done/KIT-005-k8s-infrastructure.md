@@ -1,13 +1,13 @@
 ---
 id: "KIT-005"
-status: "in-progress"
+status: "done"
 priority: "high"
 assignee: ""
 epic: "v2-github-integration"
 dueDate: null
 created: "2026-08-03"
 modified: "2026-08-03"
-completedAt: null
+completedAt: "2026-08-03"
 labels: ["infra", "k8s"]
 order: "b0"
 ---

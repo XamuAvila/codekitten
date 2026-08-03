@@ -49,9 +49,15 @@ const mockListFiles = vi.fn().mockImplementation(() => {
   });
 });
 
+const mockCreateComment = vi.fn().mockImplementation(() => {
+  callOrder.push("createComment");
+  return Promise.resolve({ data: { id: 1, html_url: "https://github.com/o/r/pull/42#issuecomment-1" } });
+});
+
 vi.mock("@octokit/rest", () => ({
   Octokit: class MockOctokit {
     pulls = { listFiles: mockListFiles };
+    issues = { createComment: mockCreateComment };
   },
 }));
 
@@ -137,12 +143,13 @@ describe("runPipeline", () => {
     });
   });
 
-  it("calls steps in order: clone → diff → fetchPrFiles → analyze", async () => {
+  it("calls steps in order: clone → diff → fetchPrFiles → comment", async () => {
     await runPipeline(baseConfig);
 
-    // clone happens first, then fetch (for diff), then listFiles (PR files)
-    expect(callOrder.indexOf("clone")).toBeLessThan(callOrder.indexOf("fetch"));
-    expect(callOrder.indexOf("fetch")).toBeLessThan(callOrder.indexOf("listFiles"));
+    // Full clone first, then diff, then PR files, then the placeholder comment
+    expect(callOrder.indexOf("clone")).toBeLessThan(callOrder.indexOf("diff"));
+    expect(callOrder.indexOf("diff")).toBeLessThan(callOrder.indexOf("listFiles"));
+    expect(callOrder.indexOf("listFiles")).toBeLessThan(callOrder.indexOf("createComment"));
   });
 
   it("returns completed PipelineResult on success", async () => {

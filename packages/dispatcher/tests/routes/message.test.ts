@@ -124,16 +124,18 @@ describe("POST /review/:jobId/message", () => {
     expect(res.body.code).toBe("NOT_FOUND");
   });
 
-  it("increments followUpCount in Redis status", async () => {
+  it("does not increment followUpCount — the Pod owns that counter", async () => {
     seedActiveJob(mockRedis, "review-org-repo-5");
 
     await request(buildApp(mockRedis))
       .post("/review/review-org-repo-5/message")
       .send({ message: "first", sender: "dev" });
 
+    // The dispatcher publishes fire-and-forget; only the Pod that actually
+    // receives the message increments the counter. Double-counting otherwise.
     const rawAfter = mockRedis._store.get("review:review-org-repo-5:status");
     expect(rawAfter).toBeDefined();
     const statusAfter = JSON.parse(rawAfter!);
-    expect(statusAfter.followUpCount).toBe(1);
+    expect(statusAfter.followUpCount).toBe(0);
   });
 });

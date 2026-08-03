@@ -21,10 +21,7 @@ export async function cloneRepo(
 
   try {
     const git = simpleGit();
-    await git.clone(authUrl, destDir, {
-      "--depth": "1",
-      "--branch": branch,
-    });
+    await git.clone(authUrl, destDir);
   } catch (error: unknown) {
     const rawMessage = error instanceof Error ? error.message : String(error);
     // Sanitize: replace any occurrence of the token in the error message

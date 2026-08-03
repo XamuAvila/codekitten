@@ -1,142 +1,125 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// --- Mock ioredis ---
-const mockHset = vi.fn().mockResolvedValue(1);
-const mockHgetall = vi.fn().mockResolvedValue({});
-const mockHincrby = vi.fn().mockResolvedValue(1);
-
-vi.mock("ioredis", () => ({
-  Redis: class MockRedis {
-    hset = mockHset;
-    hgetall = mockHgetall;
-    hincrby = mockHincrby;
-  },
-}));
-
 import { reportStatus, incrementFollowUpCount, getStatus } from "../../src/redis/status.js";
 
+function createMockRedis(store?: Map<string, string>) {
+  const data = store ?? new Map<string, string>();
+  return {
+    get: vi.fn((key: string) => Promise.resolve(data.get(key) ?? null)),
+    set: vi.fn((key: string, value: string) => {
+      data.set(key, value);
+      return Promise.resolve("OK");
+    }),
+  } as unknown as import("ioredis").Redis;
+}
+
 describe("reportStatus", () => {
+  let redis: ReturnType<typeof createMockRedis>;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    redis = createMockRedis();
   });
 
-  it("writes status to Redis hash with correct key", async () => {
-    const redis = { hset: mockHset, hgetall: mockHgetall, hincrby: mockHincrby } as any;
-
+  it("writes status to Redis with correct key", async () => {
     await reportStatus(redis, "job-1", "running");
 
-    expect(mockHset).toHaveBeenCalledWith(
-      "review:job-1:status",
-      "status",
-      "running",
-    );
+    expect(redis.set).toHaveBeenCalledOnce();
+    const [key, value] = (redis.set as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(key).toBe("review:job-1:status");
+    const parsed = JSON.parse(value);
+    expect(parsed.status).toBe("running");
   });
 
   it("sets correct status value for reviewing", async () => {
-    const redis = { hset: mockHset, hgetall: mockHgetall, hincrby: mockHincrby } as any;
-
     await reportStatus(redis, "job-2", "reviewing");
 
-    expect(mockHset).toHaveBeenCalledWith(
-      "review:job-2:status",
-      "status",
-      "reviewing",
-    );
+    const [, value] = (redis.set as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(value).status).toBe("reviewing");
   });
 
   it("sets completedAt when status is completed", async () => {
-    const redis = { hset: mockHset, hgetall: mockHgetall, hincrby: mockHincrby } as any;
-
     await reportStatus(redis, "job-1", "completed");
 
-    // Should have two hset calls: one for status, one for completedAt
-    expect(mockHset).toHaveBeenCalledWith(
-      "review:job-1:status",
-      "status",
-      "completed",
-    );
-    expect(mockHset).toHaveBeenCalledWith(
-      "review:job-1:status",
-      "completedAt",
-      expect.any(String),
-    );
+    const [, value] = (redis.set as ReturnType<typeof vi.fn>).mock.calls[0];
+    const parsed = JSON.parse(value);
+    expect(parsed.status).toBe("completed");
+    expect(parsed.completedAt).toBeDefined();
   });
 
   it("sets completedAt when status is failed", async () => {
-    const redis = { hset: mockHset, hgetall: mockHgetall, hincrby: mockHincrby } as any;
-
     await reportStatus(redis, "job-1", "failed");
 
-    expect(mockHset).toHaveBeenCalledWith(
-      "review:job-1:status",
-      "status",
-      "failed",
-    );
-    expect(mockHset).toHaveBeenCalledWith(
-      "review:job-1:status",
-      "completedAt",
-      expect.any(String),
-    );
+    const [, value] = (redis.set as ReturnType<typeof vi.fn>).mock.calls[0];
+    const parsed = JSON.parse(value);
+    expect(parsed.status).toBe("failed");
+    expect(parsed.completedAt).toBeDefined();
+  });
+
+  it("merges with existing status data", async () => {
+    const store = new Map<string, string>();
+    store.set("review:job-1:status", JSON.stringify({
+      jobId: "job-1", status: "queued", podName: "pod-1",
+      createdAt: "2026-08-03T00:00:00Z", followUpCount: 0,
+    }));
+    redis = createMockRedis(store);
+
+    await reportStatus(redis, "job-1", "running");
+
+    const [, value] = (redis.set as ReturnType<typeof vi.fn>).mock.calls[0];
+    const parsed = JSON.parse(value);
+    expect(parsed.status).toBe("running");
+    expect(parsed.podName).toBe("pod-1");
+    expect(parsed.followUpCount).toBe(0);
   });
 });
 
 describe("incrementFollowUpCount", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("increments followUpCount from 0 to 1", async () => {
-    mockHincrby.mockResolvedValue(1);
-    const redis = { hset: mockHset, hgetall: mockHgetall, hincrby: mockHincrby } as any;
+    const store = new Map<string, string>();
+    store.set("review:job-1:status", JSON.stringify({
+      jobId: "job-1", status: "reviewing", podName: "pod-1",
+      createdAt: "2026-08-03T00:00:00Z", followUpCount: 0,
+    }));
+    const redis = createMockRedis(store);
 
-    await incrementFollowUpCount(redis, "job-1");
+    const result = await incrementFollowUpCount(redis, "job-1");
 
-    expect(mockHincrby).toHaveBeenCalledWith(
-      "review:job-1:status",
-      "followUpCount",
-      1,
-    );
+    expect(result).toBe(1);
   });
 
   it("increments followUpCount from 2 to 3", async () => {
-    mockHincrby.mockResolvedValue(3);
-    const redis = { hset: mockHset, hgetall: mockHgetall, hincrby: mockHincrby } as any;
+    const store = new Map<string, string>();
+    store.set("review:job-1:status", JSON.stringify({
+      jobId: "job-1", status: "reviewing", podName: "pod-1",
+      createdAt: "2026-08-03T00:00:00Z", followUpCount: 2,
+    }));
+    const redis = createMockRedis(store);
 
     const result = await incrementFollowUpCount(redis, "job-1");
 
     expect(result).toBe(3);
-    expect(mockHincrby).toHaveBeenCalledWith(
-      "review:job-1:status",
-      "followUpCount",
-      1,
-    );
+  });
+
+  it("returns 0 for missing key", async () => {
+    const redis = createMockRedis();
+    const result = await incrementFollowUpCount(redis, "nonexistent");
+    expect(result).toBe(0);
   });
 });
 
 describe("getStatus", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("returns null for missing key", async () => {
-    mockHgetall.mockResolvedValue({});
-    const redis = { hset: mockHset, hgetall: mockHgetall, hincrby: mockHincrby } as any;
-
+    const redis = createMockRedis();
     const result = await getStatus(redis, "nonexistent");
-
     expect(result).toBeNull();
-    expect(mockHgetall).toHaveBeenCalledWith("review:nonexistent:status");
   });
 
   it("returns parsed ReviewJobStatus for existing key", async () => {
-    mockHgetall.mockResolvedValue({
-      jobId: "job-1",
-      status: "reviewing",
-      podName: "reviewer-job-1",
-      createdAt: "2026-08-03T00:00:00Z",
-      followUpCount: "2",
-    });
-    const redis = { hset: mockHset, hgetall: mockHgetall, hincrby: mockHincrby } as any;
+    const store = new Map<string, string>();
+    store.set("review:job-1:status", JSON.stringify({
+      jobId: "job-1", status: "reviewing", podName: "pod-1",
+      createdAt: "2026-08-03T00:00:00Z", followUpCount: 2,
+    }));
+    const redis = createMockRedis(store);
 
     const result = await getStatus(redis, "job-1");
 

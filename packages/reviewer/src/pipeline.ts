@@ -20,9 +20,9 @@ export async function runPipeline(
   const cloneDir = `/tmp/clones/${config.jobId}`;
 
   try {
-    // 1. Clone
+    // 1. Clone (full clone, all branches)
     console.log(`[reviewer] Processing job: review-${config.repo.replace("/", "-")}-${config.prNumber}`);
-    console.log(`[reviewer] Cloning ${config.repo} (depth=1)...`);
+    console.log(`[reviewer] Cloning ${config.repo}...`);
     const clone = await cloneRepo(config.repo, config.headRef, cloneDir, config.token);
     console.log(`[reviewer] Clone complete: ${formatBytes(clone.sizeBytes)}`);
 
@@ -87,7 +87,8 @@ export async function runPipeline(
   } catch (error) {
     const durationMs = Date.now() - start;
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[reviewer] Job failed: ${message}`);
+    const details = error instanceof Error && "details" in error ? JSON.stringify((error as Record<string, unknown>).details) : "";
+    console.error(`[reviewer] Job failed: ${message}${details ? ` | ${details}` : ""}`);
 
     return {
       status: "failed",

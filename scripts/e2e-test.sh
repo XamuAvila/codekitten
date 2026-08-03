@@ -29,6 +29,9 @@ IDLE_TIMEOUT="${IDLE_TIMEOUT:-30}"  # 30s for testing, not 10min
 POLL_INTERVAL=3
 POLL_TIMEOUT=120
 
+# Pin the context — never operate against whatever cluster happens to be current.
+kubectl() { command kubectl --context=minikube "$@"; }
+
 # --- Step 1: Verify cluster is ready ---
 info "Checking cluster health..."
 HEALTH=$(curl -sf "${DISPATCHER_URL}/health" 2>/dev/null || echo "FAIL")
@@ -108,10 +111,12 @@ fi
 sleep 2
 STATUS_RESPONSE=$(curl -sf "${DISPATCHER_URL}/status/$JOB_ID" 2>/dev/null || echo "{}")
 FOLLOW_COUNT=$(echo "$STATUS_RESPONSE" | grep -o '"followUpCount":[0-9]*' | cut -d: -f2)
-if [ "$FOLLOW_COUNT" -ge 1 ] 2>/dev/null; then
-  pass "Follow-up count: $FOLLOW_COUNT"
+# Exactly 1: only the Pod that consumed the message increments. A count of 2
+# means the dispatcher is double-counting on publish (regression).
+if [ "$FOLLOW_COUNT" = "1" ]; then
+  pass "Follow-up count: 1"
 else
-  info "Could not verify follow-up count (non-blocking)"
+  fail "Expected followUpCount=1, got '$FOLLOW_COUNT' (double-count regression?)"
 fi
 
 # --- Step 6: Wait for idle timeout ---
