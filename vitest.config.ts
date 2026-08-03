@@ -9,6 +9,8 @@ export default defineConfig({
           root: "packages/shared",
           include: ["tests/**/*.test.ts"],
           environment: "node",
+          // Load repo-root .env (DEEPSEEK_API_KEY etc.) into the test env
+          setupFiles: ["../../vitest.setup.ts"],
         },
       },
       {
@@ -17,6 +19,7 @@ export default defineConfig({
           root: "packages/dispatcher",
           include: ["tests/**/*.test.ts"],
           environment: "node",
+          setupFiles: ["../../vitest.setup.ts"],
         },
       },
       {
@@ -25,6 +28,7 @@ export default defineConfig({
           root: "packages/reviewer",
           include: ["tests/**/*.test.ts"],
           environment: "node",
+          setupFiles: ["../../vitest.setup.ts"],
         },
       },
     ],

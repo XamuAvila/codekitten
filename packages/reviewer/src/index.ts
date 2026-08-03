@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { AppError } from "@kitten/shared";
 import { Redis } from "ioredis";
 import { runPipeline } from "./pipeline.js";
@@ -168,12 +169,15 @@ async function postReviewComment(
   }
 }
 
-main().catch((error: unknown) => {
-  if (error instanceof AppError) {
-    console.error(`[reviewer] Fatal: [${error.code}] ${error.message}`);
-  } else {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[reviewer] Fatal: ${message}`);
-  }
-  process.exit(1);
-});
+// Auto-run only when executed directly (not when imported by tests)
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch((error: unknown) => {
+    if (error instanceof AppError) {
+      console.error(`[reviewer] Fatal: [${error.code}] ${error.message}`);
+    } else {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[reviewer] Fatal: ${message}`);
+    }
+    process.exit(1);
+  });
+}
