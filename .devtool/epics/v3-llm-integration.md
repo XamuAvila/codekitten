@@ -25,10 +25,10 @@ Four gaps block real reviews:
 Implement the full LLM review path inside the reviewer Pod:
 
 1. **Monolithic guardrailed prompt** — system prompt with hard guardrails (no commit/push ever, only valuable findings, exact file:line, no style nits, no praise, cyclomatic complexity awareness, max 20 findings) + context (conventions file, config rules) + user content (diff, changed files).
-2. **Native structured output** — tool use (Anthropic) / `response_format: json_schema` (OpenAI) returning `Finding[]`. Zero fragile JSON parsing.
+2. **Native structured output** — tool use with `input_schema` (Anthropic — universal, works on Anthropic AND the DeepSeek Anthropic endpoint) / `response_format: json_schema` (OpenAI) returning `Finding[]`. Zero fragile JSON parsing. **Note:** Anthropic's newer `output_config.format.json_schema` is NOT supported by the DeepSeek Anthropic endpoint (compat table: "output_config: Only effort is supported") — classic tool use is the universal path; `output_config` is a future Anthropic-only optimization.
 3. **Multi-vendor adapters** — `AnthropicAdapter` (SDK covers Anthropic + DeepSeek via `base_url`) and `OpenAIAdapter`. Key resolved by `base_url` exact match.
-4. **Hybrid PR posting** — try GitHub PR Review with inline diff-position comments; fall back to a Markdown table in the review body.
-5. **Chunked multi-round review** — PRs exceeding `max_tokens` are split into chunks, each reviewed separately, findings consolidated and deduped.
+4. **Hybrid PR posting** — try GitHub PR Review with inline comments (`line`/`side`/`subject_type: line` — the modern API; legacy `position` avoided); fall back to a Markdown table in the review body.
+5. **Chunked multi-round review** — PRs exceeding `max_context_tokens` are split into chunks, each reviewed separately, findings consolidated and deduped. **Two distinct token limits:** `max_context_tokens` (chunking budget, default 1M) vs `max_output_tokens` (per-request LLM output limit — DeepSeek caps at 384K, Anthropic models lower; default ~16K).
 6. **`force` / `stop` commands** — via `POST /review/:jobId/message` (same handler reused by the future v5 webhook).
 7. **Contextual follow-ups** — `explain`/follow-up questions answered by the LLM with the review context (findings + prompt) available in the Pod.
 
@@ -40,7 +40,7 @@ Execution order (sequential — each depends on the previous):
 |---|---|---|
 | [KIT-011](../features/KIT-011-llm-review.md) | [US-011](../../docs/stories/US-011-llm-review.md) | AnthropicAdapter, monolithic guardrailed prompt, tool use Finding[], post findings as table comment |
 | [KIT-012](../features/KIT-012-multi-vendor.md) | [US-012](../../docs/stories/US-012-multi-vendor.md) | OpenAIAdapter, `provider`/`base_url` config, key resolution by base_url, DeepSeek via Anthropic SDK |
-| [KIT-013](../features/KIT-013-inline-comments.md) | [US-013](../../docs/stories/US-013-inline-diff-comments.md) | GitHub PR Review with inline diff-position comments, table fallback |
+| [KIT-013](../features/KIT-013-inline-comments.md) | [US-013](../../docs/stories/US-013-inline-diff-comments.md) | GitHub PR Review with inline comments (`line`/`side`, not legacy `position`), table fallback |
 | [KIT-014](../features/KIT-014-chunked-review.md) | [US-014](../../docs/stories/US-014-chunked-multi-round-review.md) | Token budget check, file chunking, multi-round LLM calls, finding consolidation/dedup |
 | [KIT-015](../features/KIT-015-force-command.md) | [US-015](../../docs/stories/US-015-force-full-review.md) | Budget-exceeded comment on PR, `force` command via message, unlimited review |
 | [KIT-016](../features/KIT-016-stop-command.md) | [US-016](../../docs/stories/US-016-stop-review.md) | `stop` command, chunk abort, status `cancelled`, cleanup |
@@ -94,7 +94,7 @@ One K8s Secret (`kitten-llm-keys`) with all three keys; the Pod resolves by URL 
 
 ```
 1. Estimate tokens from diff + files + conventions
-2. If total <= max_tokens (default 1_000_000): single LLM call
+2. If total <= max_context_tokens (default 1_000_000): single LLM call
 3. Else: split changed files into chunks (largest first, fill to budget)
 4. Review each chunk (LLM call per chunk, same guardrailed prompt)
 5. Consolidate: dedup by file:line, merge Finding[]
@@ -106,7 +106,7 @@ One K8s Secret (`kitten-llm-keys`) with all three keys; the Pod resolves by URL 
 
 | Message | Effect |
 |---|---|
-| `force` | Cancels the budget question — re-runs review without `max_tokens` limit (full context) |
+| `force` | Cancels the budget question — re-runs review without `max_context_tokens` limit (full context) |
 | `stop` | Aborts remaining chunks, reports status `cancelled`, posts "Review cancelled" comment, Pod exits |
 | other | Follow-up question — answered by LLM with review context (findings + original prompt) |
 
@@ -119,7 +119,7 @@ The message handler is the same one v5's webhook will call — the webhook only 
 | Language | TypeScript (Node.js) |
 | Anthropic SDK | `@anthropic-ai/sdk` (covers DeepSeek via base_url) |
 | OpenAI SDK | `openai` |
-| Structured output | Native tool use (Anthropic) / `response_format: json_schema` (OpenAI) |
+| Structured output | Tool use with `input_schema` (Anthropic — works on Anthropic + DeepSeek) / `response_format: json_schema` (OpenAI) |
 | GitHub API | Existing octokit usage in reviewer (`github/`) |
 | Token estimation | Existing dry-run logic, adapted |
 | Testing | vitest + real LLM calls (DeepSeek — cheap, configurable base_url) |
@@ -133,7 +133,8 @@ interface ReviewerConfig {
   readonly baseUrl?: string;                    // NEW — default = provider official URL
   readonly language: string;                    // default "en"
   readonly model: string;                       // default "deepseek-v4-flash"
-  readonly maxTokens: number;                   // default 1_000_000 (was 200_000)
+  readonly maxContextTokens: number;            // NEW (renamed) — chunking budget, default 1_000_000
+  readonly maxOutputTokens: number;             // NEW — per-request output limit, default 16_000 (DeepSeek caps 384K)
   readonly maxFindings: number;                 // NEW — default 20
   readonly maxComplexity: number;               // NEW — default 10 (cyclomatic threshold)
   readonly trigger: string;                     // default "@reviewer"
@@ -165,7 +166,8 @@ reviewer:
   base_url: https://api.deepseek.com/anthropic   # optional; default = provider official URL
   language: en
   model: deepseek-v4-flash
-  max_tokens: 1000000            # default 1M (was 200k)
+  max_context_tokens: 1000000    # NEW — chunking budget (was max_tokens, default 1M)
+  max_output_tokens: 16000       # NEW — per-request output limit (DeepSeek caps at 384K)
   max_findings: 20               # NEW
   max_complexity: 10             # NEW — cyclomatic complexity threshold
   trigger: "@reviewer"
@@ -233,7 +235,7 @@ packages/reviewer/
 │   │   └── index.ts
 │   ├── github/
 │   │   ├── comment.ts              # post findings (table fallback)
-│   │   ├── review.ts               # NEW — PR Review API, inline diff-position comments
+│   │   ├── review.ts               # NEW — PR Review API, inline comments (line/side, not legacy position)
 │   │   └── index.ts
 │   ├── agent.ts                    # + force/stop command handling, contextual follow-ups
 │   └── redis/status.ts             # + "cancelled" status
@@ -250,7 +252,7 @@ k8s/
 | Unknown base_url | Validation error `{ code: "VALIDATION" }` — no key mapping |
 | LLM auth failure (401) | Review `failed`, error `AUTH_FAILED` |
 | LLM rate limit / timeout | Retry: 3 attempts, backoff 1s → 2s → 4s; all fail → `failed` |
-| Invalid structured output | Retry once; still invalid → `failed` with `LLM_OUTPUT_INVALID` |
+| Invalid structured output | Retry once; still invalid → `failed` with `LLM_OUTPUT_INVALID` (tool use `input_schema` mismatch) |
 | Chunk LLM call fails (multi-round) | Failed chunks skipped, successful chunks reported, warning comment |
 | `force`/`stop` to dead Pod | 404/410 `{ code: "NOT_FOUND", message: "Review pod not active" }` |
 | `stop` mid-review | Remaining chunks aborted, status `cancelled`, "Review cancelled" comment, Pod exits |

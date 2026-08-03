@@ -22,13 +22,13 @@ Then a GitHub Pull Request Review is created (state: COMMENTED)
 And each finding that maps to a diff position becomes an inline comment on the correct file:line
 ```
 
-### AC-2: Diff position mapping
+### AC-2: Diff line mapping
 
 ```
 Given a Finding with file and line
 When the comment is posted
-Then the position is computed from the PR file patch (diff_hunk)
-And the comment anchors to the correct line in the diff
+Then the target line is verified against the PR file patch (diff_hunk) — the line must fall inside a hunk
+And the comment uses the modern API: path + line + side (RIGHT) + subject_type: "line"
 ```
 
 ### AC-3: Table fallback for unmappable findings
@@ -59,5 +59,6 @@ Then no review is created or a comment states no issues found (no crash)
 ## Notes
 
 - Hybrid strategy (mirrors CodeRabbit): try inline per finding, fallback to table
-- `position` computed from `PullRequestFile.patch` (already fetched in pipeline)
+- Line check computed from `PullRequestFile.patch` (already fetched in pipeline) — line must be inside a hunk
+- Modern API anchors: `path` + `line` + `side: RIGHT` + `subject_type: "line"` (legacy `position` parameter avoided — GitHub docs recommend line/side)
 - Unmappable findings never block the review — table fallback is always safe
