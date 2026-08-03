@@ -34,7 +34,7 @@ See [US-013](../../docs/stories/US-013-inline-diff-comments.md).
 
 ### Consumes
 
-- `PullRequestFile.patch` (`packages/shared/src/types/pull-request-file.ts:7`) — unified diff per file, fetched by `fetchPrFiles` (`packages/reviewer/src/git/files.ts:31`)
+- `PullRequestFile.patch` (`packages/shared/src/types/pull-request-file.ts:8`, **optional** — binary/removed files have none) — unified diff per file, fetched by `fetchPrFiles` (`packages/reviewer/src/git/files.ts:12`)
 - `Finding` (`packages/shared/src/types/review-job.ts:23-32`): `file`, `line`
 - `postReviewComment` body format (`packages/reviewer/src/github/comment.ts:73-92`) — pattern for review body
 - Octokit `pulls.createReview` — `@octokit/rest` already used in `comment.ts:1`
@@ -66,7 +66,7 @@ See [US-013](../../docs/stories/US-013-inline-diff-comments.md).
 4. - [ ] **GREEN — postPrReview**: implement review building: map findings → inline comments (hunk membership), rest → table; single `createReview` call. PASS.
 5. - [ ] Commit: `feat(reviewer): post PR review with inline diff comments and table fallback`
 6. - [ ] **RED — pipeline test**: `packages/reviewer/tests/pipeline.test.ts` — pipeline calls `postPrReview` (not `postReviewComment`) with findings + patch map; `postedInline`/`inTable` logged. Run: FAIL.
-7. - [ ] **GREEN — pipeline wiring**: replace `postReviewComment` call (`pipeline.ts` line ~76) with `postPrReview`; build patch map from `prFiles`. Keep non-fatal error handling (comment.ts:32-34 pattern). PASS.
+7. - [ ] **GREEN — pipeline wiring**: replace `postReviewComment` call (`pipeline.ts` line ~76) with `postPrReview`; build patch map from `prFiles`, **filtering out files with `patch === undefined`** (binary/removed files cannot anchor inline — they fall to the table). Keep non-fatal error handling (comment.ts:32-34 pattern). PASS.
 8. - [ ] Commit: `feat(reviewer): wire PR review inline posting into pipeline`
 9. - [ ] **RED — empty findings test**: pipeline with zero findings does not crash; review body states no issues found or no review created (US-013 AC-5). Run: FAIL.
 10. - [ ] **GREEN — empty findings handling**. PASS.

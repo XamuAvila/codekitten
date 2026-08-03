@@ -22,13 +22,8 @@ See [US-012](../../docs/stories/US-012-multi-vendor.md).
 
 ### Files
 
-**Modified (shared):**
-- `packages/shared/src/types/reviewer-config.ts` — add `provider: z.enum(["anthropic", "openai"])` and `baseUrl: z.string().optional()` to `ReviewerConfigSchema` (lines 16-26)
-- `packages/shared/src/config/defaults.ts` — `DEFAULT_CONFIG`: `provider: "anthropic"`, `baseUrl: "https://api.deepseek.com/anthropic"` (user decision: DeepSeek default via Anthropic SDK)
-- `packages/shared/src/config/parse-config.ts` — `RawReviewerSchema` + `toReviewerConfig`: accept `provider`, `base_url`
-
 **Created (shared):**
-- `packages/shared/src/llm/openai-adapter.ts` — `OpenAIAdapter implements LLMAdapter`
+- `packages/shared/src/llm/openai-adapter.ts` — `OpenAIAdapter implements LLMAdapter` (incl. `respond` — the KIT-011 interface addition)
 - `packages/shared/src/llm/factory.ts` — `createLlmAdapter(config)` + `resolveLlmKeyEnv(baseUrl)`
 
 **Modified (dispatcher):**
@@ -45,8 +40,8 @@ See [US-012](../../docs/stories/US-012-multi-vendor.md).
 ### Consumes
 
 - `AnthropicAdapter` from KIT-011 — used by `createLlmAdapter` when `provider: "anthropic"`
-- `LLMAdapter` interface (`packages/shared/src/llm/adapter.ts:26`)
-- `ReviewerConfig.provider` / `.baseUrl` — new fields (this card adds them to the schema)
+- `LLMAdapter` interface (`packages/shared/src/llm/adapter.ts:26`) — includes `respond` (added in KIT-011)
+- `ReviewerConfig.provider` / `.baseUrl` — schema fields added in KIT-011 (this card implements factory + key resolution, not the schema)
 - `PipelineConfig` (`packages/reviewer/src/types.ts:37-46`)
 
 ### Produces
@@ -71,21 +66,25 @@ See [US-012](../../docs/stories/US-012-multi-vendor.md).
 
 ## Implementation Plan
 
-1. - [ ] **RED — config schema test**: extend `packages/shared/tests/config/parse-config.test.ts`: YAML `provider: "openai"` → `provider: "openai"`; `base_url: "https://x"` → `baseUrl: "https://x"`; invalid `provider: "watson"` → `VALIDATION`. Run: FAIL.
-2. - [ ] **GREEN — schema + defaults**: add `provider`/`baseUrl` to `ReviewerConfigSchema`, `RawReviewerSchema`, `toReviewerConfig`, `DEFAULT_CONFIG`. PASS.
-3. - [ ] Commit: `feat(shared): add provider/base_url to reviewer config`
+1. - [ ] **RED — config schema test**: extend `packages/shared/tests/config/parse-config.test.ts`: YAML `provider: "openai"` → `provider: "openai"`; `base_url: "https://x"` → `baseUrl: "https://x"`; invalid `provider: "watson"` → `VALIDATION`. Run: FAIL. (Schema fields were added by KIT-011 — this RED is a coverage test for the provider/base_url paths, which KIT-011's step 2 may already satisfy; if green already, keep as regression coverage and mark PASS without code change.)
+2. - [ ] **GREEN — schema coverage**: only if step 1 still fails (e.g. `provider`/`base_url` not yet in `RawReviewerSchema`). PASS.
+3. - [ ] Commit: `test(shared): cover provider/base_url config parsing`
 4. - [ ] **RED — factory + key resolution test**: create `packages/shared/tests/llm/factory.test.ts`. Assert: each known base_url maps to the correct env name; unknown base_url throws `AppError("VALIDATION")`; `createLlmAdapter` returns AnthropicAdapter for provider "anthropic" and OpenAIAdapter for "openai". Run: FAIL.
 5. - [ ] **GREEN — factory.ts**: implement `resolveLlmKeyEnv` + `createLlmAdapter`. PASS.
 6. - [ ] Commit: `feat(shared): add LLM adapter factory with base_url key resolution`
-7. - [ ] **RED — OpenAIAdapter test**: create `packages/shared/tests/llm/openai-adapter.test.ts` (mock `openai` SDK). Assert: `response_format.json_schema` present with `FindingSchema`-shaped schema and `strict: true`; response `choices[0].message` JSON parsed into `ReviewResult.findings`; metadata populated. Run: FAIL.
-8. - [ ] **GREEN — openai-adapter.ts**: implement. PASS.
+7. - [ ] **RED — OpenAIAdapter test**: create `packages/shared/tests/llm/openai-adapter.test.ts` (mock `openai` SDK). Assert: `response_format.json_schema` present with `FindingSchema`-shaped schema and `strict: true`; response `choices[0].message` JSON parsed into `ReviewResult.findings`; metadata populated; `respond` returns the text answer. Run: FAIL.
+8. - [ ] **GREEN — openai-adapter.ts**: implement (incl. `respond`). PASS.
 9. - [ ] Commit: `feat(shared): add OpenAIAdapter with json_schema structured output`
-10. - [ ] **RED — integration test with real DeepSeek**: create `packages/reviewer/tests/llm-integration.test.ts` (skipped unless `DEEPSEEK_API_KEY` env set, `describe.skipIf`). Assert: real call via AnthropicAdapter (base_url deepseek, model deepseek-v4-flash) returns `findings: []`-compatible `ReviewResult` (schema-valid) for a small fixture prompt. Run with `DEEPSEEK_API_KEY=... pnpm --filter @kitten/reviewer test` — FAIL until adapter wired.
-11. - [ ] **GREEN — pipeline wiring**: pipeline builds adapter via `createLlmAdapter` with config from repo + env key; `LLM_OUTPUT_INVALID` error path (retry once, then `failed`). PASS.
+10. - [ ] **RED — pipeline wiring test (mocked)**: `packages/reviewer/tests/pipeline.test.ts` — pipeline builds the adapter via `createLlmAdapter` (mock factory or mock SDK): provider "openai" config → OpenAI SDK called, findings parsed. **RED — LLM_OUTPUT_INVALID path**: adapter returns schema-invalid output → retried once → still invalid → `failed` with `LLM_OUTPUT_INVALID`. Run: FAIL.
+11. - [ ] **GREEN — pipeline wiring**: pipeline builds adapter via `createLlmAdapter` with config from repo + env key; output validation + single retry → `LLM_OUTPUT_INVALID`. PASS.
 12. - [ ] Commit: `feat(reviewer): wire multi-vendor adapter into pipeline`
-13. - [ ] **Manifest + Secret**: add `kitten-llm-keys` Secret template (`k8s/secret.yaml`), Pod env `secretKeyRef` for the 3 keys in `manifest.ts`, and `minikube-setup.sh` Secret creation. Update `packages/dispatcher/tests/k8s/manifest.test.ts`. Run: `pnpm --filter @kitten/dispatcher test` — PASS.
-14. - [ ] Commit: `feat(k8s): add kitten-llm-keys secret and Pod env wiring`
-15. - [ ] Run: `pnpm test && pnpm lint` — all green.
+13. - [ ] **RED — integration test with real DeepSeek**: create `packages/reviewer/tests/llm-integration.test.ts` (skipped unless `DEEPSEEK_API_KEY` env set, `describe.skipIf`). Assert: full pipeline path via `createLlmAdapter` with a config `provider: "anthropic", base_url: "https://api.deepseek.com/anthropic", model: "deepseek-v4-flash"` returns a schema-valid `ReviewResult` for a small fixture prompt. Run with `DEEPSEEK_API_KEY=... pnpm --filter @kitten/reviewer test` — passes only after step 11 wiring.
+14. - [ ] **GREEN — integration**: if the real call exposes adapter shape issues, fix them. PASS.
+15. - [ ] Commit: `feat(reviewer): validate real DeepSeek calls through the factory`
+16. - [ ] **RED — manifest test**: update `packages/dispatcher/tests/k8s/manifest.test.ts` first — assert Pod env includes the 3 LLM keys via `secretKeyRef` from `kitten-llm-keys`. Run: FAIL.
+17. - [ ] **GREEN — manifest + Secret**: add `kitten-llm-keys` Secret template (`k8s/secret.yaml`), Pod env `secretKeyRef` for the 3 keys in `manifest.ts`, `minikube-setup.sh` Secret creation. PASS.
+18. - [ ] Commit: `feat(k8s): add kitten-llm-keys secret and Pod env wiring`
+19. - [ ] Run: `pnpm test && pnpm lint` — all green.
 
 ## How to Test
 

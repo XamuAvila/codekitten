@@ -37,7 +37,7 @@ And the earlier partial review is superseded/noted
 ```
 Given no active Pod for a jobId
 When I POST /review/:jobId/message with "force"
-Then the response is 404/410 { code: "NOT_FOUND", message: "Review pod not active" }
+Then the response is 404/410 { code: "NOT_FOUND" } with "Job {jobId} not found" or "Job {jobId} is no longer active"
 ```
 
 ### AC-4: Regular follow-ups unaffected

@@ -32,12 +32,12 @@ Then the prompt includes the original review findings and the guardrailed review
 And the model can answer from the actual review context
 ```
 
-### AC-3: Clone reused — no re-clone
+### AC-3: No re-clone — context from memory
 
 ```
 Given a Pod answering a follow-up
 When the follow-up runs
-Then no re-clone happens (the Pod's live clone is used)
+Then no re-clone happens (the review context — findings and the original prompt with the diff — lives in memory)
 ```
 
 ### AC-4: Follow-up LLM failure does not kill the agent
@@ -63,3 +63,4 @@ Then the prompt uses the review context + the new question only (no multi-turn h
 - Replaces v2's echo/ack (`postFollowUpAck`) with real LLM answers
 - Same message handler reused by v5 webhook
 - Single-turn by design — Pod lifetime is 10 min, multi-turn memory is out of scope
+- The initial review's clone dir is removed by the pipeline's cleanup (`pipeline.ts:99-102`), so follow-ups answer from the in-memory context (findings + original prompt with diff), never from disk

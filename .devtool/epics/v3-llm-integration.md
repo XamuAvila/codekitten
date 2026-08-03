@@ -42,7 +42,7 @@ Execution order (sequential — each depends on the previous):
 | [KIT-012](../features/KIT-012-multi-vendor.md) | [US-012](../../docs/stories/US-012-multi-vendor.md) | OpenAIAdapter, `provider`/`base_url` config, key resolution by base_url, DeepSeek via Anthropic SDK |
 | [KIT-013](../features/KIT-013-inline-comments.md) | [US-013](../../docs/stories/US-013-inline-diff-comments.md) | GitHub PR Review with inline comments (`line`/`side`, not legacy `position`), table fallback |
 | [KIT-014](../features/KIT-014-chunked-review.md) | [US-014](../../docs/stories/US-014-chunked-multi-round-review.md) | Token budget check, file chunking, multi-round LLM calls, finding consolidation/dedup |
-| [KIT-015](../features/KIT-015-force-command.md) | [US-015](../../docs/stories/US-015-force-full-review.md) | Budget-exceeded comment on PR, `force` command via message, unlimited review |
+| [KIT-015](../features/KIT-015-force-command.md) | [US-015](../../docs/stories/US-015-force-full-review.md) | `force` command via message, unlimited review (budget-exceeded comment is posted by KIT-014) |
 | [KIT-016](../features/KIT-016-stop-command.md) | [US-016](../../docs/stories/US-016-stop-review.md) | `stop` command, chunk abort, status `cancelled`, cleanup |
 | [KIT-017](../features/KIT-017-contextual-followups.md) | [US-017](../../docs/stories/US-017-contextual-followups.md) | LLM-powered follow-ups with review context (findings + prompt) |
 
@@ -183,6 +183,8 @@ reviewer:
 
 DeepSeek needs no special provider value — `provider: anthropic` + `base_url: https://api.deepseek.com/anthropic` (DeepSeek is Anthropic-compatible; verified against `api-docs.deepseek.com`).
 
+**Default shipped vs default resolution:** `DEFAULT_CONFIG` (no `.reviewer.yml`) ships `provider: anthropic`, `base_url: https://api.deepseek.com/anthropic`, `model: deepseek-v4-flash` — the product default is DeepSeek (cheap, user decision). When `base_url` is absent from `.reviewer.yml`, it resolves to the provider's official URL (`api.anthropic.com` / `api.openai.com`).
+
 ## Monolithic prompt (guardrails — non-negotiable)
 
 System prompt, in order:
@@ -254,7 +256,7 @@ k8s/
 | LLM rate limit / timeout | Retry: 3 attempts, backoff 1s → 2s → 4s; all fail → `failed` |
 | Invalid structured output | Retry once; still invalid → `failed` with `LLM_OUTPUT_INVALID` (tool use `input_schema` mismatch) |
 | Chunk LLM call fails (multi-round) | Failed chunks skipped, successful chunks reported, warning comment |
-| `force`/`stop` to dead Pod | 404/410 `{ code: "NOT_FOUND", message: "Review pod not active" }` |
+| `force`/`stop` to dead Pod | 404/410 `{ code: "NOT_FOUND", message: "Job {jobId} not found" }` (dispatcher `routes/message.ts:36`) or `"Job {jobId} is no longer active"` (line 42) |
 | `stop` mid-review | Remaining chunks aborted, status `cancelled`, "Review cancelled" comment, Pod exits |
 
 Structured errors everywhere: `{ code, message, details }`.

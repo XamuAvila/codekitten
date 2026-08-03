@@ -70,8 +70,8 @@ See [US-014](../../docs/stories/US-014-chunked-multi-round-review.md).
 4. - [ ] **RED — consolidate test**: create `packages/reviewer/tests/chunker/consolidate.test.ts`. Cases: identical `file:line` deduped (highest severity wins); different files kept; empty input → empty output; order stable (first occurrence wins). Run: FAIL.
 5. - [ ] **GREEN — consolidate.ts**: implement. PASS.
 6. - [ ] Commit: `feat(reviewer): consolidate and dedup multi-round findings`
-7. - [ ] **RED — pipeline multi-round test**: `packages/reviewer/tests/pipeline.test.ts` — a mocked adapter records one call when under budget, N calls when over (chunk files); consolidated findings posted; budget question comment posted when over. Run: FAIL.
-8. - [ ] **GREEN — pipeline chunking**: budget check → single call or chunk loop → `consolidateFindings` → `postPrReview` (KIT-013) + budget question comment. PASS.
+7. - [ ] **RED — pipeline multi-round test**: `packages/reviewer/tests/pipeline.test.ts` — a mocked adapter records one call when under budget, N calls when over (chunk files); consolidated findings posted; budget question comment posted when over; **a chunk whose LLM call fails (after retries) is skipped and the PR comment notes the failed chunk while other findings appear** (US-014 AC-4). Run: FAIL.
+8. - [ ] **GREEN — pipeline chunking**: budget check → single call or chunk loop → `consolidateFindings` → `postPrReview` (KIT-013) + budget question comment; failed-chunk warning appended to the posted comment. PASS.
 9. - [ ] Commit: `feat(reviewer): multi-round chunked review in pipeline`
 10. - [ ] Run: `pnpm test && pnpm lint` — all green.
 

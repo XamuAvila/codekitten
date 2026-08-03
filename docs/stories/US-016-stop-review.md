@@ -53,7 +53,7 @@ Then the Pod shuts down and status becomes "cancelled"
 ```
 Given no active Pod for a jobId
 When I POST /review/:jobId/message with "stop"
-Then the response is 404/410 { code: "NOT_FOUND", message: "Review pod not active" }
+Then the response is 404/410 { code: "NOT_FOUND" } with "Job {jobId} not found" or "Job {jobId} is no longer active"
 ```
 
 ### AC-6: No-op after completion
@@ -62,7 +62,7 @@ Then the response is 404/410 { code: "NOT_FOUND", message: "Review pod not activ
 Given a review already completed
 When I POST /review/:jobId/message with "stop"
 Then nothing changes (status stays "completed")
-And the response is the standard dead-Pod/not-active error
+And the response is the standard 404 { code: "NOT_FOUND" }
 ```
 
 ## Notes
