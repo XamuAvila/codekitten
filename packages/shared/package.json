@@ -15,6 +15,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "picomatch": "^4.0.5",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
