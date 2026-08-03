@@ -16,7 +16,7 @@ import type { PipelineConfig } from "./types.js";
  *
  * Pipeline failure → reports "failed" status, exits with code 1.
  */
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const requiredEnvs = [
     "REVIEW_JOB_ID",
     "REVIEW_REPO",
