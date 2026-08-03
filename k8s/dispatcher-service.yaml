@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kitten-dispatcher
+  namespace: kitten
+  labels:
+    app: kitten-dispatcher
+spec:
+  type: NodePort
+  ports:
+    - port: 3001
+      targetPort: 3001
+  selector:
+    app: kitten-dispatcher
