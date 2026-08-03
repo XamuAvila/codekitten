@@ -60,6 +60,9 @@ importers:
       supertest:
         specifier: ^7.2.2
         version: 7.2.2
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/shared:
     dependencies:
@@ -84,6 +87,9 @@ importers:
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0
+      minimatch:
+        specifier: ^10.2.6
+        version: 10.2.6
       simple-git:
         specifier: ^3.36.0
         version: 3.36.0

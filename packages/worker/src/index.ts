@@ -1,4 +1,5 @@
 import { Redis } from "ioredis";
+import { startWorker } from "./consumer.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 
@@ -15,8 +16,12 @@ async function main(): Promise<void> {
 
   console.log("[worker] Listening for jobs on queue: reviews");
 
+  // Start the BullMQ worker — consumes review jobs, runs pipeline
+  const worker = startWorker(redisUrl);
+
   const shutdown = async () => {
     console.log("[worker] Shutting down...");
+    await worker.close();
     await redis.quit();
     process.exit(0);
   };

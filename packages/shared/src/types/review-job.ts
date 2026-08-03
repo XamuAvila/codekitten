@@ -10,7 +10,7 @@ export const ReviewJobSchema = z.object({
   headRef: z.string().min(1),
   baseRef: z.string().min(1),
   sender: z.string().min(1),
-  isReReview: z.boolean(),
+  isReReview: z.boolean().default(false),
   /** v1: if absent, worker scans all files. v2+: populated from GitHub PR API. */
   changedFiles: z.array(z.string()).readonly().optional(),
 });
