@@ -10,10 +10,17 @@ import { DEFAULT_CONFIG } from "./defaults.js";
  * Raw .reviewer.yml shape — snake_case keys under a top-level `reviewer` key.
  * Every field is optional; missing fields fall back to DEFAULT_CONFIG.
  */
-const RawReviewerSchema = z.object({
+// strictObject: unknown keys (e.g. legacy `max_tokens` from v2) must fail with
+// VALIDATION, not be silently stripped — zod 4 z.object strips by default.
+const RawReviewerSchema = z.strictObject({
+  provider: z.enum(["anthropic", "openai"]).optional(),
+  base_url: z.string().url().optional(),
   language: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
-  max_tokens: z.number().int().positive().optional(),
+  max_context_tokens: z.number().int().positive().optional(),
+  max_output_tokens: z.number().int().positive().optional(),
+  max_findings: z.number().int().positive().optional(),
+  max_complexity: z.number().int().positive().optional(),
   trigger: z.string().min(1).optional(),
   blocking: z.enum(["comment_only", "request_changes"]).optional(),
   skip: z.array(z.string()).optional(),
@@ -48,9 +55,14 @@ function toValidationError(message: string, error: unknown): AppError {
 
 function toReviewerConfig(raw: RawReviewer): ReviewerConfig {
   return ReviewerConfigSchema.parse({
+    provider: raw.provider ?? DEFAULT_CONFIG.provider,
+    baseUrl: raw.base_url ?? DEFAULT_CONFIG.baseUrl,
     language: raw.language ?? DEFAULT_CONFIG.language,
     model: raw.model ?? DEFAULT_CONFIG.model,
-    maxTokens: raw.max_tokens ?? DEFAULT_CONFIG.maxTokens,
+    maxContextTokens: raw.max_context_tokens ?? DEFAULT_CONFIG.maxContextTokens,
+    maxOutputTokens: raw.max_output_tokens ?? DEFAULT_CONFIG.maxOutputTokens,
+    maxFindings: raw.max_findings ?? DEFAULT_CONFIG.maxFindings,
+    maxComplexity: raw.max_complexity ?? DEFAULT_CONFIG.maxComplexity,
     trigger: raw.trigger ?? DEFAULT_CONFIG.trigger,
     blocking: raw.blocking ?? DEFAULT_CONFIG.blocking,
     skip: raw.skip ?? DEFAULT_CONFIG.skip,

@@ -8,7 +8,10 @@ const VALID_YAML = `
 reviewer:
   language: pt-BR
   model: claude-opus-4-8
-  max_tokens: 100000
+  max_context_tokens: 100000
+  max_output_tokens: 16000
+  max_findings: 5
+  max_complexity: 12
   trigger: "@bot"
   blocking: request_changes
   skip:
@@ -22,9 +25,14 @@ describe("parseReviewerConfig", () => {
     const config = parseReviewerConfig(VALID_YAML);
 
     expect(config).toEqual({
+      provider: "anthropic",
+      baseUrl: "https://api.deepseek.com/anthropic",
       language: "pt-BR",
       model: "claude-opus-4-8",
-      maxTokens: 100000,
+      maxContextTokens: 100000,
+      maxOutputTokens: 16000,
+      maxFindings: 5,
+      maxComplexity: 12,
       trigger: "@bot",
       blocking: "request_changes",
       skip: ["**/dist/**"],
@@ -86,6 +94,41 @@ reviewer:
 
     expect(config.model).toBe("claude-haiku-4-5");
     expect(config.language).toBe(DEFAULT_CONFIG.language);
-    expect(config.maxTokens).toBe(DEFAULT_CONFIG.maxTokens);
+    expect(config.maxContextTokens).toBe(DEFAULT_CONFIG.maxContextTokens);
+  });
+
+  it("parseReviewerConfig parses max_findings and max_complexity", () => {
+    const config = parseReviewerConfig(`
+reviewer:
+  max_findings: 3
+  max_complexity: 8
+`);
+
+    expect(config.maxFindings).toBe(3);
+    expect(config.maxComplexity).toBe(8);
+  });
+
+  it("parseReviewerConfig rejects legacy max_tokens key with VALIDATION", () => {
+    const legacy = `
+reviewer:
+  max_tokens: 100000
+`;
+
+    try {
+      parseReviewerConfig(legacy);
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe("VALIDATION");
+    }
+  });
+
+  it("parseReviewerConfig returns defaults with v3 fields for empty YAML", () => {
+    const config = parseReviewerConfig("");
+
+    expect(config.maxContextTokens).toBe(DEFAULT_CONFIG.maxContextTokens);
+    expect(config.maxOutputTokens).toBe(DEFAULT_CONFIG.maxOutputTokens);
+    expect(config.maxFindings).toBe(DEFAULT_CONFIG.maxFindings);
+    expect(config.maxComplexity).toBe(DEFAULT_CONFIG.maxComplexity);
   });
 });
