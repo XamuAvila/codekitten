@@ -43,8 +43,6 @@ export interface PipelineConfig {
   readonly token: string;
   readonly redisUrl: string;
   readonly skipPatterns: readonly string[];
-  /** Abort between chunks — stop command (KIT-016). */
-  readonly signal?: AbortSignal;
 }
 
 export interface PipelineResult {
@@ -55,6 +53,8 @@ export interface PipelineResult {
   readonly findings?: readonly Finding[];
   /** Built guardrailed prompt — KIT-017 reuses it for follow-up context. */
   readonly prompt?: { readonly system: string; readonly user: string };
+  /** Resolved reviewer config — KIT-017 reuses it for follow-up LLM calls. */
+  readonly llmConfig?: ReviewerConfig;
   readonly error?: string;
   readonly metadata: {
     readonly repo: string;

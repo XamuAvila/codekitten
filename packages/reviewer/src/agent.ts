@@ -1,8 +1,9 @@
 import { Redis } from "ioredis";
-import type { PubSubMessage } from "@kitten/shared";
+import type { PubSubMessage, ReviewerConfig } from "@kitten/shared";
+import { createLlmAdapter } from "@kitten/shared";
 import { subscribeToChannel } from "./redis/pubsub.js";
 import { reportStatus, incrementFollowUpCount } from "./redis/status.js";
-import { postFollowUpAck } from "./github/comment.js";
+import { postFollowUpAnswer } from "./github/comment.js";
 
 const DEFAULT_IDLE_TIMEOUT_MS = 600_000; // 10 minutes
 
@@ -17,6 +18,13 @@ export interface AgentConfig {
   readonly onForce?: () => Promise<void>;
   /** Invoked when a follow-up message equals "stop" (KIT-016). */
   readonly onStop?: () => Promise<void>;
+  /** LLM config for follow-up answers (KIT-017). */
+  readonly llmConfig?: ReviewerConfig;
+  /** Review context — findings + original prompt (KIT-017). */
+  readonly reviewContext?: {
+    readonly findings: readonly { severity: string; file: string; line: number; finding: string; suggestion?: string; ruleId?: string }[];
+    readonly prompt: { readonly system: string; readonly user: string };
+  };
 }
 
 /**
@@ -100,9 +108,9 @@ export async function startAgent(config: AgentConfig): Promise<void> {
         return;
       }
 
-      // Post ack comment on PR (non-fatal) — real LLM answer in KIT-017
-      if (config.token && config.repo && config.prNumber) {
-        void postFollowUpAck(config.token, config.repo, config.prNumber, payload.message);
+      // LLM answer with review context (KIT-017) — non-fatal, agent stays alive
+      if (config.llmConfig && config.reviewContext && config.token && config.repo && config.prNumber) {
+        void answerFollowUp(config, payload.message);
       }
     } else if (msg.type === "shutdown") {
       console.log("[reviewer] Shutdown message received");
@@ -112,6 +120,39 @@ export async function startAgent(config: AgentConfig): Promise<void> {
 
   const subscription = await subscribeToChannel(subscriber, channel, handleMessage);
   console.log(`[reviewer] Subscribed to ${channel}`);
+
+  /**
+   * Answers a follow-up question with the LLM, using the review context
+   * (original guardrailed prompt + numbered findings). Single-turn by design
+   * (US-017 AC-5). Failure keeps the agent alive (US-017 AC-4).
+   */
+  async function answerFollowUp(agent: AgentConfig, question: string): Promise<void> {
+    try {
+      const adapter = createLlmAdapter(agent.llmConfig!);
+      const findingsList = agent.reviewContext!.findings
+        .map((f, i) => `${i + 1}. [${f.severity}] ${f.file}:${f.line} — ${f.finding}`)
+        .join("\n");
+      const user = [
+        `The user asks about this review: "${question}"`,
+        "",
+        "Findings from the review:",
+        findingsList || "(no findings)",
+        "",
+        "Answer concisely, referencing the review context.",
+      ].join("\n");
+
+      const answer = await adapter.respond(
+        agent.reviewContext!.prompt.system,
+        `${agent.reviewContext!.prompt.user}\n\n${user}`,
+        agent.llmConfig!.maxOutputTokens,
+      );
+
+      await postFollowUpAnswer(agent.token!, agent.repo!, agent.prNumber!, answer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[reviewer] Follow-up answer failed: ${message}`);
+    }
+  }
 
   // Start idle timer
   resetIdleTimer();

@@ -139,6 +139,42 @@ export function formatFindingsComment(
 }
 
 /**
+ * Post a follow-up answer (real LLM response, KIT-017) on the PR.
+ * Non-fatal: logs error but does not throw.
+ */
+export async function postFollowUpAnswer(
+  token: string,
+  repo: string,
+  prNumber: number,
+  answer: string,
+): Promise<void> {
+  const body = [
+    `🐱 **Kitten** [KITTEN-TEST]`,
+    ``,
+    answer,
+  ].join("\n");
+
+  try {
+    const [owner, repoName] = repo.split("/");
+    if (!owner || !repoName) {
+      console.error("[reviewer] Invalid repo format for follow-up answer — expected 'owner/repo'");
+      return;
+    }
+
+    const octokit = new Octokit({ auth: token });
+    await octokit.issues.createComment({
+      owner,
+      repo: repoName,
+      issue_number: prNumber,
+      body,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[reviewer] Failed to post follow-up answer: ${message}`);
+  }
+}
+
+/**
  * Formats the follow-up acknowledgment comment body.
  * Includes [KITTEN-TEST] prefix for test fixture identification.
  */

@@ -25,6 +25,8 @@ import fs from "node:fs";
 export interface PipelineOptions {
   /** Skip chunking — single full-context call (force command, KIT-015). */
   readonly ignoreBudget?: boolean;
+  /** Abort between chunks — stop command (KIT-016). */
+  readonly signal?: AbortSignal;
 }
 
 export async function runPipeline(
@@ -105,7 +107,7 @@ export async function runPipeline(
     const results: Array<{ result?: ReviewResult; error?: Error }> = [];
     for (const [index, chunk] of chunks.entries()) {
       // Stop command aborts between chunks (KIT-016) — remaining chunks skipped
-      if (config.signal?.aborted) {
+      if (opts?.signal?.aborted) {
         console.log(`[reviewer] Review aborted by stop command — ${chunks.length - index} chunks skipped`);
         break;
       }
@@ -236,6 +238,7 @@ export async function runPipeline(
       diff,
       findings: result.findings,
       prompt,
+      llmConfig: reviewerConfig.config,
       metadata: { repo: config.repo, prNumber: config.prNumber, durationMs },
     };
   } catch (error) {

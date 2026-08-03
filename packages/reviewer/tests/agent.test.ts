@@ -40,10 +40,26 @@ vi.mock("ioredis", () => {
 
 // --- Mock github/comment ---
 const mockPostFollowUpAck = vi.fn().mockResolvedValue(undefined);
+const mockPostFollowUpAnswer = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../src/github/comment.js", () => ({
   postFollowUpAck: (...args: unknown[]) => mockPostFollowUpAck(...args),
+  postFollowUpAnswer: (...args: unknown[]) => mockPostFollowUpAnswer(...args),
 }));
+
+// --- Mock LLM adapter (via createLlmAdapter mock) ---
+const { mockCreateLlmAdapter, mockRespond } = vi.hoisted(() => ({
+  mockCreateLlmAdapter: vi.fn(),
+  mockRespond: vi.fn(),
+}));
+
+vi.mock("@kitten/shared", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@kitten/shared")>();
+  return {
+    ...mod,
+    createLlmAdapter: mockCreateLlmAdapter,
+  };
+});
 
 // --- Mock process.exit ---
 const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {}) as any);
@@ -61,8 +77,9 @@ describe("startAgent", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    // Restore default mock for subscribeToChannel
+    // Restore default mocks wiped by clearAllMocks
     mockSubscribeToChannel.mockResolvedValue({ unsubscribe: mockUnsubscribe });
+    mockCreateLlmAdapter.mockReturnValue({ review: vi.fn(), respond: vi.fn() });
   });
 
   afterEach(() => {
@@ -297,6 +314,98 @@ describe("startAgent", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(onStop).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await agentPromise;
+  });
+
+  it("answers a follow-up question with the LLM using review context", async () => {
+    let capturedHandler: ((msg: any) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+      capturedHandler = handler;
+      return { unsubscribe: mockUnsubscribe };
+    });
+
+    mockRespond.mockResolvedValue("The change moves validation to the service layer.");
+    mockCreateLlmAdapter.mockReturnValue({ review: vi.fn(), respond: mockRespond });
+
+    const reviewContext = {
+      findings: [{ severity: "high" as const, file: "a.ts", line: 1, finding: "Bug" }],
+      prompt: { system: "guardrailed system", user: "diff + files" },
+    };
+
+    const agentPromise = startAgent({
+      ...baseConfig,
+      token: "token",
+      repo: "org/repo",
+      prNumber: 5,
+      reviewContext,
+      llmConfig: {
+        provider: "anthropic" as const,
+        baseUrl: "https://api.deepseek.com/anthropic",
+        model: "deepseek-v4-flash",
+        maxContextTokens: 1_000_000,
+        maxOutputTokens: 16_000,
+        maxFindings: 20,
+        maxComplexity: 10,
+        language: "en",
+        trigger: "@reviewer",
+        blocking: "comment_only" as const,
+        skip: [],
+        conventionsFile: "CLAUDE.md",
+        rules: [],
+      },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    capturedHandler!({
+      type: "follow_up",
+      payload: { message: "explain finding 1", sender: "alice" },
+      timestamp: "2026-08-03T00:00:00Z",
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mockCreateLlmAdapter).toHaveBeenCalledTimes(1);
+    expect(mockRespond).toHaveBeenCalledTimes(1);
+    const [system, user, maxTokens] = mockRespond.mock.calls[0];
+    expect(system).toContain("guardrailed system");
+    expect(user).toContain("explain finding 1");
+    expect(user).toContain("Bug"); // findings in context
+    expect(maxTokens).toBeGreaterThan(0);
+
+    expect(mockPostFollowUpAnswer).toHaveBeenCalledWith("token", "org/repo", 5, "The change moves validation to the service layer.");
+    expect(mockPostFollowUpAck).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await agentPromise;
+  });
+
+  it("keeps the agent alive when the follow-up LLM call fails", async () => {
+    let capturedHandler: ((msg: any) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+      capturedHandler = handler;
+      return { unsubscribe: mockUnsubscribe };
+    });
+
+    mockRespond.mockRejectedValue(new Error("LLM down"));
+    mockCreateLlmAdapter.mockReturnValue({ review: vi.fn(), respond: mockRespond });
+
+    const agentPromise = startAgent({
+      ...baseConfig,
+      reviewContext: { findings: [], prompt: { system: "s", user: "u" } },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    capturedHandler!({
+      type: "follow_up",
+      payload: { message: "why?", sender: "alice" },
+      timestamp: "2026-08-03T00:00:00Z",
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Agent still alive: not exited, not shutdown
+    expect(mockExit).not.toHaveBeenCalled();
+    expect(mockPostFollowUpAnswer).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(5000);
     await agentPromise;

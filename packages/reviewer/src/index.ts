@@ -133,6 +133,14 @@ async function main(): Promise<void> {
     prNumber: config.prNumber,
     onForce,
     onStop,
+    // KIT-017: follow-up answers reuse the review's config + context
+    llmConfig: result.llmConfig,
+    reviewContext: result.findings
+      ? {
+          findings: result.findings,
+          prompt: result.prompt ?? { system: "", user: "" },
+        }
+      : undefined,
   });
 }
 
