@@ -71,9 +71,11 @@ const mockCreateComment = vi.fn().mockImplementation(() => {
   return Promise.resolve({ data: { id: 1, html_url: "https://github.com/o/r/pull/42#issuecomment-1" } });
 });
 
+const mockCreateReview = vi.fn().mockResolvedValue({ data: { id: 1 } });
+
 vi.mock("@octokit/rest", () => ({
   Octokit: class MockOctokit {
-    pulls = { listFiles: mockListFiles };
+    pulls = { listFiles: mockListFiles, createReview: mockCreateReview };
     issues = { createComment: mockCreateComment };
   },
 }));
@@ -237,7 +239,7 @@ describe("runPipeline", () => {
     expect(result.prompt!.system).toMatch(/never commit/i);
   });
 
-  it("posts a findings table comment, not the v2 dry-run placeholder", async () => {
+  it("posts a PR review via createReview, not a dry-run placeholder comment", async () => {
     mockReview.mockResolvedValue(
       llmReviewResult([
         { severity: "low", file: "src/app.ts", line: 2, finding: "Minor issue" },
@@ -246,11 +248,25 @@ describe("runPipeline", () => {
 
     await runPipeline(baseConfig);
 
+    // PR review (inline) replaced the issue comment for findings
+    expect(mockCreateReview).toHaveBeenCalledTimes(1);
+    expect(mockCreateComment).not.toHaveBeenCalled();
+    const [params] = mockCreateReview.mock.calls[0];
+    expect(params.state).toBe("COMMENTED");
+    expect(params.body).not.toContain("DRY RUN");
+    expect(params.body).toContain("[KITTEN-TEST]");
+  });
+
+  it("posts an issue comment (no PR review) when there are zero findings", async () => {
+    mockReview.mockResolvedValue(llmReviewResult([]));
+
+    await runPipeline(baseConfig);
+
+    // Empty findings: no createReview crash, comment states no issues found
     expect(mockCreateComment).toHaveBeenCalledTimes(1);
     const body = (mockCreateComment.mock.calls[0][0] as { body: string }).body;
-    expect(body).toContain("[KITTEN-TEST]");
-    expect(body).not.toContain("DRY RUN");
-    expect(body).toContain("| Severity");
+    expect(body).toMatch(/no issues found/i);
+    expect(mockCreateReview).not.toHaveBeenCalled();
   });
 
   it("includes diff result in pipeline result", async () => {

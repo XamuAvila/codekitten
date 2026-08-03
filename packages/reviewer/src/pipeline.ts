@@ -6,7 +6,8 @@ import { fetchPrFiles } from "./git/files.js";
 import { readChangedFiles } from "./git/read-files.js";
 import { buildReviewPrompt } from "./prompt/build-prompt.js";
 import { callWithRetry } from "./pipeline/retry.js";
-import { formatFindingsComment, postReviewComment } from "./github/comment.js";
+import { postReviewComment } from "./github/comment.js";
+import { postPrReview } from "./github/review.js";
 import type { PipelineConfig, PipelineResult } from "./types.js";
 import fs from "node:fs";
 
@@ -89,25 +90,36 @@ export async function runPipeline(
     });
     console.log(`[reviewer] LLM review complete: ${result.findings.length} findings`);
 
-    // 8. Post findings as a comment (non-fatal)
-    const commentData = {
-      repo: config.repo,
-      prNumber: config.prNumber,
-      model: result.metadata.model,
-      inputTokens: result.metadata.inputTokens,
-      outputTokens: result.metadata.outputTokens,
-      insertions: diff.insertions,
-      deletions: diff.deletions,
-    };
-    await postReviewComment(config.token, config.repo, config.prNumber, {
-      repo: config.repo,
-      prNumber: config.prNumber,
-      fileCount: { total: prFiles.length, analyzed: files.length, skipped: prFiles.length - files.length },
-      tokenEstimate: result.metadata.inputTokens + result.metadata.outputTokens,
-      model: result.metadata.model,
-      diff: { insertions: diff.insertions, deletions: diff.deletions },
-      findingsBody: formatFindingsComment(result.findings, commentData),
-    });
+    // 8. Post findings as a PR review with inline comments (non-fatal).
+    //    Zero findings → plain issue comment stating no issues found.
+    //    Build the patch map from PR files, filtering out files without a
+    //    patch (binary/removed — they cannot anchor inline, fall to table).
+    const filePatches = new Map(
+      prFiles
+        .filter((f) => f.patch !== undefined)
+        .map((f) => [f.filename, f.patch!]),
+    );
+
+    if (result.findings.length === 0) {
+      await postReviewComment(config.token, config.repo, config.prNumber, {
+        repo: config.repo,
+        prNumber: config.prNumber,
+        fileCount: { total: prFiles.length, analyzed: files.length, skipped: prFiles.length - files.length },
+        tokenEstimate: result.metadata.inputTokens + result.metadata.outputTokens,
+        model: result.metadata.model,
+        diff: { insertions: diff.insertions, deletions: diff.deletions },
+        findingsBody: noIssuesComment(),
+      });
+    } else {
+      const posted = await postPrReview(
+        config.token,
+        config.repo,
+        config.prNumber,
+        result.findings,
+        filePatches,
+      );
+      console.log(`[reviewer] PR review posted: ${posted.postedInline} inline, ${posted.inTable} in table`);
+    }
 
     const durationMs = Date.now() - start;
     console.log(`[reviewer] Job completed in ${(durationMs / 1000).toFixed(1)}s`);
@@ -156,6 +168,14 @@ function isAuthError(error: unknown): boolean {
     error instanceof Error &&
     ("isAuth" in error || (error as { status?: unknown }).status === 401)
   );
+}
+
+function noIssuesComment(): string {
+  return [
+    `🐱 **Kitten Review** [KITTEN-TEST]`,
+    ``,
+    `No issues found — the LLM review did not report any findings.`,
+  ].join("\n");
 }
 
 interface ConfigReadResult {
