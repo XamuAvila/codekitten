@@ -74,6 +74,19 @@ else
   warn "Re-run with: GITHUB_TOKEN=<your-token> ./scripts/minikube-setup.sh"
 fi
 
+# ─── 5b. Apply LLM provider keys secret ──────────────────────────────────────
+# If any LLM key is exported, create the secret from them; otherwise the
+# placeholder from k8s/secret.yaml (applied above) is used.
+if [[ -n "${ANTHROPIC_API_KEY:-}" || -n "${OPENAI_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-}" ]]; then
+  info "Creating kitten-llm-keys secret from environment..."
+  ${K} create secret generic kitten-llm-keys \
+    --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+    --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+    --from-literal=DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-}" \
+    -n kitten --dry-run=client -o yaml | ${K} apply -f -
+  success "Secret 'kitten-llm-keys' created from environment"
+fi
+
 # ─── 6. Apply Redis deployment + service ─────────────────────────────────────
 info "Applying Redis deployment and service..."
 ${K} apply -f "${PROJECT_ROOT}/k8s/redis-deployment.yaml"

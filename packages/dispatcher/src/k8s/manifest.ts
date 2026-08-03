@@ -69,6 +69,35 @@ export function buildPodManifest(request: ReviewJob, config: PodConfig): V1Pod {
                 },
               },
             },
+            // LLM provider keys — one Secret, three keys; the Pod resolves
+            // which to use by base_url at runtime (KIT-012).
+            {
+              name: "ANTHROPIC_API_KEY",
+              valueFrom: {
+                secretKeyRef: {
+                  name: "kitten-llm-keys",
+                  key: "ANTHROPIC_API_KEY",
+                },
+              },
+            },
+            {
+              name: "OPENAI_API_KEY",
+              valueFrom: {
+                secretKeyRef: {
+                  name: "kitten-llm-keys",
+                  key: "OPENAI_API_KEY",
+                },
+              },
+            },
+            {
+              name: "DEEPSEEK_API_KEY",
+              valueFrom: {
+                secretKeyRef: {
+                  name: "kitten-llm-keys",
+                  key: "DEEPSEEK_API_KEY",
+                },
+              },
+            },
           ],
           resources: {
             requests: {

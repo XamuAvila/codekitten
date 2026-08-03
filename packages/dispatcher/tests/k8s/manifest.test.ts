@@ -71,6 +71,26 @@ describe("buildPodManifest", () => {
     });
   });
 
+  it("references the three LLM keys from the kitten-llm-keys secret", () => {
+    const pod = buildPodManifest(sampleJob, sampleConfig);
+    const envVars = pod.spec?.containers[0]?.env ?? [];
+
+    for (const [envName, key] of [
+      ["ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"],
+      ["OPENAI_API_KEY", "OPENAI_API_KEY"],
+      ["DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY"],
+    ] as const) {
+      const env = envVars.find((e) => e.name === envName);
+
+      expect(env).toBeDefined();
+      expect(env?.value).toBeUndefined();
+      expect(env?.valueFrom?.secretKeyRef).toEqual({
+        name: "kitten-llm-keys",
+        key,
+      });
+    }
+  });
+
   it("sets resource limits", () => {
     const pod = buildPodManifest(sampleJob, sampleConfig);
     const resources = pod.spec?.containers[0]?.resources;
