@@ -56,3 +56,23 @@ export interface PipelineResult {
     readonly durationMs: number;
   };
 }
+
+export interface ReviewCommentData {
+  readonly repo: string;
+  readonly prNumber: number;
+  readonly fileCount: { readonly total: number; readonly analyzed: number; readonly skipped: number };
+  readonly tokenEstimate: number;
+  readonly model: string;
+  readonly diff: { readonly insertions: number; readonly deletions: number };
+}
+
+export interface PrMetadata {
+  readonly title: string;
+  readonly author: string;
+  readonly state: "open" | "closed" | "merged";
+}
+
+export interface CommentResult {
+  readonly id: number;
+  readonly url: string;
+}

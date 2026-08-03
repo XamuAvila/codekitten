@@ -1,7 +1,15 @@
 /**
  * AppErrorCode — the only structured error codes used across the system.
  */
-export type AppErrorCode = "VALIDATION" | "NOT_FOUND" | "DUPLICATE" | "SERVICE_UNAVAILABLE" | "AUTH_FAILED";
+export type AppErrorCode =
+  | "VALIDATION"
+  | "NOT_FOUND"
+  | "DUPLICATE"
+  | "SERVICE_UNAVAILABLE"
+  | "AUTH_FAILED"
+  | "RATE_LIMITED"
+  | "UNPROCESSABLE"
+  | "GITHUB_API_ERROR";
 
 export interface AppErrorDetail {
   readonly [key: string]: unknown;
