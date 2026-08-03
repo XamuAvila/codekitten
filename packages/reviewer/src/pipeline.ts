@@ -1,5 +1,4 @@
-import { parseReviewerConfig, DEFAULT_CONFIG, AppError } from "@kitten/shared";
-import { AnthropicAdapter } from "@kitten/shared";
+import { parseReviewerConfig, DEFAULT_CONFIG, AppError, createLlmAdapter } from "@kitten/shared";
 import type { ReviewContext, ReviewJob } from "@kitten/shared";
 import { cloneRepo } from "./git/clone.js";
 import { generateDiff } from "./git/diff.js";
@@ -64,11 +63,8 @@ export async function runPipeline(
     const prompt = buildReviewPrompt(diff.raw, files, reviewerConfig.config, conventions);
 
     // 7. Call the LLM (retry transient failures; never retry auth)
-    const adapter = new AnthropicAdapter({
-      apiKey: resolveApiKey(reviewerConfig.config.baseUrl),
-      baseUrl: reviewerConfig.config.baseUrl ?? "https://api.anthropic.com",
-      defaultModel: reviewerConfig.config.model,
-    });
+    // Factory selects the SDK by provider and the key by base_url (KIT-012).
+    const adapter = createLlmAdapter(reviewerConfig.config);
 
     const job: ReviewJob = {
       repo: config.repo,
@@ -87,7 +83,7 @@ export async function runPipeline(
       prompt,
     };
 
-    console.log(`[reviewer] Calling LLM: ${reviewerConfig.config.model} (base_url ${adapterBaseUrl(reviewerConfig.config.baseUrl)})`);
+    console.log(`[reviewer] Calling LLM: ${reviewerConfig.config.model} (base_url ${reviewerConfig.config.baseUrl ?? "provider default"})`);
     const result = await callWithRetry(() => adapter.review(context), {
       isRetryable: (error) => !isAuthError(error),
     });
@@ -153,29 +149,6 @@ export async function runPipeline(
     // Cleanup even on failure — invariant: clone dirs are always cleaned up
     cleanup(cloneDir);
   }
-}
-
-/**
- * Key resolution by base_url (minimal, KIT-011).
- * KIT-012 replaces this with the exact-match factory map
- * (anthropic → ANTHROPIC_API_KEY, deepseek → DEEPSEEK_API_KEY, openai → OPENAI_API_KEY).
- */
-function resolveApiKey(baseUrl: string | undefined): string {
-  const key = baseUrl?.includes("deepseek")
-    ? process.env["DEEPSEEK_API_KEY"]
-    : process.env["ANTHROPIC_API_KEY"];
-  if (!key) {
-    throw new AppError(
-      "AUTH_FAILED",
-      `Missing API key for base_url ${baseUrl ?? "default"}`,
-      [{ baseUrl }],
-    );
-  }
-  return key;
-}
-
-function adapterBaseUrl(baseUrl: string | undefined): string {
-  return baseUrl ?? "https://api.anthropic.com";
 }
 
 function isAuthError(error: unknown): boolean {

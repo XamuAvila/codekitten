@@ -3,20 +3,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Track call order across mocks
 const callOrder: string[] = [];
 
-// --- Mock AnthropicAdapter (consumed from @kitten/shared dist) ---
-// Mocking at the adapter level, not the SDK: the pipeline imports the adapter
-// from @kitten/shared (dist build), and vi.mock on the transitive SDK import
-// does not intercept the dist's resolution.
-const { mockReview } = vi.hoisted(() => ({ mockReview: vi.fn() }));
+// --- Mock createLlmAdapter + adapters (consumed from @kitten/shared dist) ---
+// Mocking at the adapter level, not the SDK: the pipeline imports from
+// @kitten/shared (dist build), and vi.mock on the transitive SDK import does
+// not intercept the dist's resolution.
+const { mockCreateLlmAdapter, mockReview } = vi.hoisted(() => ({
+  mockCreateLlmAdapter: vi.fn(),
+  mockReview: vi.fn(),
+}));
 
 vi.mock("@kitten/shared", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@kitten/shared")>();
   return {
     ...mod,
-    AnthropicAdapter: class {
-      review = mockReview;
-      respond = vi.fn();
-    },
+    createLlmAdapter: mockCreateLlmAdapter,
   };
 });
 
@@ -133,9 +133,7 @@ describe("runPipeline", () => {
     mockReaddirSync.mockReturnValue([]);
     mockStatSync.mockReturnValue({ size: 0 });
     mockReview.mockResolvedValue(llmReviewResult([]));
-
-    // LLM key env — DEFAULT_CONFIG points at DeepSeek, so the key env is DEEPSEEK
-    vi.stubEnv("DEEPSEEK_API_KEY", "test-llm-key");
+    mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn() });
 
     // Reset git mocks to default behavior
     mockGitClone.mockImplementation(() => {
@@ -185,13 +183,30 @@ describe("runPipeline", () => {
     expect(callOrder.indexOf("listFiles")).toBeLessThan(callOrder.indexOf("createComment"));
   });
 
-  it("calls the LLM exactly once with the guardrailed prompt", async () => {
+  it("builds the adapter via createLlmAdapter with config and calls the LLM once", async () => {
     await runPipeline(baseConfig);
+
+    expect(mockCreateLlmAdapter).toHaveBeenCalledTimes(1);
+    const [adapterConfig] = mockCreateLlmAdapter.mock.calls[0];
+    expect(adapterConfig.provider).toBe("anthropic");
+    expect(adapterConfig.model).toBe("deepseek-v4-flash");
 
     expect(mockReview).toHaveBeenCalledTimes(1);
     const [context] = mockReview.mock.calls[0];
     expect(context.prompt.system).toMatch(/never commit/i);
-    expect(context.config.model).toBe("deepseek-v4-flash");
+  });
+
+  it("fails with LLM_OUTPUT_INVALID when adapter throws schema validation error", async () => {
+    mockReview.mockRejectedValue(new Error("Invalid findings from LLM: ..."));
+    vi.useFakeTimers();
+
+    const promise = runPipeline(baseConfig);
+    await vi.advanceTimersByTimeAsync(10_000);
+    const result = await promise;
+    vi.useRealTimers();
+
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("Invalid findings from LLM");
   });
 
   it("returns completed PipelineResult with findings and prompt", async () => {
