@@ -48,6 +48,21 @@ Execution order (sequential — each depends on the previous):
 
 Step-by-step TDD implementation plans live in each card's `## Implementation Plan` section.
 
+### Follow-up cards (config fields specified but never wired)
+
+Opened 2026-08-04 after an audit of shipped v3 code. Three `ReviewerConfig`
+fields are parsed, validated and tested, but no source file outside config reads
+them — a maintainer can set them in `.reviewer.yml` and get silence. `rules[]` is
+a direct deviation from this epic's own prompt spec (see "Monolithic prompt" →
+user content, which lists `Reviewer rules: {rules}`); `language` and `blocking`
+were specified in the config shape without a consuming card.
+
+| Card | Story | Scope |
+|---|---|---|
+| [KIT-018](../features/KIT-018-custom-review-rules.md) | [US-018](../../docs/stories/US-018-custom-review-rules.md) | `rules[]` reaches `prompt.user`; findings carry `ruleId`; undeclared ids stripped at consolidation; rule shown on the PR |
+| [KIT-019](../features/KIT-019-review-output-language.md) | [US-019](../../docs/stories/US-019-review-output-language.md) | `language` drives LLM-authored prose via a system-prompt block; machine fields and Kitten's own notices stay canonical English |
+| [KIT-020](../features/KIT-020-blocking-review-mode.md) | [US-020](../../docs/stories/US-020-blocking-review-mode.md) | `blocking: request_changes` submits `REQUEST_CHANGES`; 422 downgrades to `COMMENT`; clean and cancelled reviews never block |
+
 ## Architecture
 
 ```

@@ -262,12 +262,18 @@ Coverage target: 80%+ on shared + dispatcher + worker.
 - Token cost tracking / budget alerts
 - Dashboard / UI
 
-## Future phases (reference only)
+## Future phases (as planned during v1 — superseded)
 
-| Phase | Scope |
-|---|---|
-| v2 — LLM Integration | Claude adapter impl, prompt builder, structured output, GitHub comment posting |
-| v3 — MCP Agentic Review | Semble MCP + filesystem tools inside worker container. Claude explores codebase via tool calls (search, find_related, read_file) instead of fixed context. Enables call-site analysis, pattern consistency checks, and deep context without pre-computing everything. Requires investigating Semble standalone viability in Docker. |
-| v4 — GitHub Integration | Webhook signature validation, GitHub App auth, re-review trigger |
-| v5 — Deep Context | git log history of touched files, pattern comparison across repo, learning from past reviews |
-| v6 — Production | K8s Job migration, monitoring, cost tracking, multi-repo |
+> **Historical.** This table records what v1 predicted, not what happened. The
+> phases were reordered after v1: GitHub integration was pulled forward to v2 and
+> LLM integration moved to v3, which pushed MCP agentic review to v4. The
+> authoritative roadmap lives in the latest epic — see
+> `v3-llm-integration.md` → "Future phases".
+
+| Phase (as predicted in v1) | Scope | Actually shipped as |
+|---|---|---|
+| v2 — LLM Integration | Claude adapter impl, prompt builder, structured output, GitHub comment posting | v3 |
+| v3 — MCP Agentic Review | Semble MCP + filesystem tools inside worker container. Claude explores codebase via tool calls (search, find_related, read_file) instead of fixed context. Enables call-site analysis, pattern consistency checks, and deep context without pre-computing everything. Requires investigating Semble standalone viability in Docker. | v4 (not started) |
+| v4 — GitHub Integration | Webhook signature validation, GitHub App auth, re-review trigger | split: pipeline/auth in v2, webhook in v5, App in v6 |
+| v5 — Deep Context | git log history of touched files, pattern comparison across repo, learning from past reviews | v7 (not started) |
+| v6 — Production | K8s Job migration, monitoring, cost tracking, multi-repo | v8 (not started) |
