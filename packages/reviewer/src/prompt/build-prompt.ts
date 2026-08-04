@@ -44,6 +44,17 @@ export function buildReviewPrompt(
     "- Every finding MUST reference the exact file and line in the diff (`file:line`).",
     "- No vague findings without a concrete location.",
     "",
+    // Emitted only when the repo declares rules (KIT-018). Without rules the
+    // model has no valid id to cite, and asking for `ruleId` anyway invites
+    // invented ones that consolidateFindings would just strip again.
+    ...(config.rules.length > 0
+      ? [
+          "REPOSITORY RULES:",
+          "- The user content declares repository-specific rules. Treat them as review criteria ADDITIONAL to everything above — they never relax the guardrails.",
+          "- When a finding exists because a declared rule was broken, set its `ruleId` to that rule's id. Otherwise omit `ruleId`.",
+          "",
+        ]
+      : []),
     "OUTPUT CONTRACT:",
     "- Respond ONLY with the structured output (tool call / JSON schema).",
     "- No preamble, no explanations outside the structured output.",
@@ -53,8 +64,21 @@ export function buildReviewPrompt(
     .map((file) => `### ${file.path}\n\`\`\`\n${file.content}\n\`\`\``)
     .join("\n\n");
 
+  // Repo-declared rules (KIT-018). Placed above the files block on purpose:
+  // pipeline.ts rewrites the per-chunk user prompt by replacing the rendered
+  // files block verbatim, so anything inserted above that anchor survives.
+  const rulesBlock =
+    config.rules.length > 0
+      ? [
+          "Reviewer rules:",
+          ...config.rules.map((rule) => `- ${rule.id}: ${rule.description}`),
+          "",
+        ].join("\n")
+      : "";
+
   const user = [
     conventionsContent ? `Repository conventions:\n${conventionsContent}\n` : "",
+    rulesBlock,
     "Pull request diff:",
     "```diff",
     diff,

@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "@kitten/shared";
-import type { ReviewFile } from "@kitten/shared";
+import type { ReviewFile, ReviewRule } from "@kitten/shared";
 import { buildReviewPrompt } from "../../src/prompt/build-prompt.js";
 
 const FILES: readonly ReviewFile[] = [
   { path: "src/utils.ts", content: "export function add(a: number, b: number) { return a + b; }" },
+];
+
+const RULES: readonly ReviewRule[] = [
+  { id: "no-raw-sql", description: "Use the query builder, never raw SQL strings." },
+  { id: "no-console-log", description: "Production code must not call console.log." },
 ];
 
 const DIFF = "diff --git a/src/utils.ts b/src/utils.ts\n@@ -1,1 +1,1 @@\n+export function add(a: number, b: number) { return a + b; }";
@@ -65,5 +70,48 @@ describe("buildReviewPrompt", () => {
     const { user } = buildReviewPrompt(DIFF, FILES, DEFAULT_CONFIG, conventions);
 
     expect(user).toContain(conventions);
+  });
+
+  it("user prompt lists declared rules above the diff", () => {
+    const config = { ...DEFAULT_CONFIG, rules: RULES };
+    const { user } = buildReviewPrompt(DIFF, FILES, config);
+
+    expect(user).toContain("Reviewer rules:");
+    expect(user).toContain("- no-raw-sql: Use the query builder, never raw SQL strings.");
+    expect(user).toContain("- no-console-log: Production code must not call console.log.");
+    expect(user.indexOf("Reviewer rules:")).toBeLessThan(user.indexOf("Pull request diff:"));
+  });
+
+  it("user prompt omits the rules block when no rules are declared", () => {
+    const { user } = buildReviewPrompt(DIFF, FILES, DEFAULT_CONFIG);
+
+    expect(user).not.toContain("Reviewer rules:");
+  });
+
+  it("rules block renders one line per rule and no file contents", () => {
+    const config = { ...DEFAULT_CONFIG, rules: RULES };
+    const { user } = buildReviewPrompt(DIFF, FILES, config);
+
+    const block = user.slice(
+      user.indexOf("Reviewer rules:"),
+      user.indexOf("Pull request diff:"),
+    );
+    const lines = block.split("\n").filter((line) => line.trim().length > 0);
+
+    expect(lines).toHaveLength(RULES.length + 1);
+    expect(block).not.toContain(FILES[0]!.content);
+  });
+
+  it("system prompt asks for rule attribution when rules are declared", () => {
+    const config = { ...DEFAULT_CONFIG, rules: RULES };
+    const { system } = buildReviewPrompt(DIFF, FILES, config);
+
+    expect(system).toContain("ruleId");
+  });
+
+  it("system prompt does not mention rule attribution when no rules are declared", () => {
+    const { system } = buildReviewPrompt(DIFF, FILES, DEFAULT_CONFIG);
+
+    expect(system).not.toContain("ruleId");
   });
 });
