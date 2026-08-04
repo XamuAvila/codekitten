@@ -1,13 +1,13 @@
 ---
 id: "KIT-018"
-status: "in-progress"
+status: "done"
 priority: "high"
 assignee: ""
 epic: "v3-llm-integration"
 dueDate: null
 created: "2026-08-04"
 modified: "2026-08-04"
-completedAt: null
+completedAt: "2026-08-04"
 labels: ["config", "prompt", "debt"]
 order: "c8"
 ---
@@ -96,3 +96,10 @@ See [US-018](../../docs/stories/US-018-custom-review-rules.md).
   and push a PR branch that adds a `console.log` to a source file. On minikube: `curl -X POST "$DISPATCHER_URL/review" -d '{"repo":"XamuAvila/kitten-test-repo","prNumber":<n>,...}'`. Expect the posted review to contain a finding on that line whose comment names `no-console-log`. Pod logs (`kubectl --context=minikube logs <jobId> -n kitten`) show the review completing without a stripped-rule warning.
 - **Negative check**: run the same review against a PR in a repo whose `.reviewer.yml` declares **no** rules — the prompt must contain no `Reviewer rules:` block (assert in the unit test) and findings must carry no `ruleId`. Separately, feed `consolidateFindings` a finding with `ruleId: "made-up"` against a one-id set and confirm the finding is still returned with `ruleId` absent and exactly one warning logged containing neither the GitHub token nor any LLM key.
 - **Done means**: `pnpm test && pnpm lint && pnpm build` all green, AND a rule declared in `.reviewer.yml` provably reaches `prompt.user`, AND a finding attributed to an undeclared rule loses only its attribution while remaining in the posted review.
+
+## Completion notes (2026-08-04)
+
+- `pnpm test` → 30 files, 203 tests, all passing (was 190 before this card; +13 from KIT-018's own steps and the earlier prompt work).
+- `pnpm build` → exit 0.
+- `pnpm lint` → **exit 1, and it already exited 1 on `master` before this branch existed.** 47 errors in three files this card never touches: `packages/reviewer/tests/agent.test.ts` (42), `packages/reviewer/tests/redis/pubsub.test.ts` (4), `packages/dispatcher/src/middleware/error-handler.ts` (1) — mostly `@typescript-eslint/no-explicit-any`. Running eslint against only this card's eight changed files exits 0. Tracked separately in [KIT-021](../KIT-021-fix-pre-existing-lint-errors.md); the "all green" clause above is therefore satisfied for everything within this card's scope and blocked outside it.
+- Manual verification on minikube was **not** run — it needs a live cluster plus LLM keys, and the `.reviewer.yml` fixture change in `kitten-test-repo`. Still outstanding.

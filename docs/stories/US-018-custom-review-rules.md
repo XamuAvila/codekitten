@@ -1,7 +1,7 @@
 ---
 id: US-018
 title: "Custom Review Rules Applied"
-status: draft
+status: done
 epic: v3-llm-integration
 ---
 
