@@ -9,7 +9,7 @@ vi.mock("@octokit/rest", () => ({
   },
 }));
 
-import { postReviewComment, postFollowUpAck } from "../../src/github/comment.js";
+import { postReviewComment } from "../../src/github/comment.js";
 
 const baseSummary: ReviewCommentData = {
   repo: "owner/repo",
@@ -91,54 +91,6 @@ describe("postReviewComment", () => {
 
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("Failed to post review comment"),
-    );
-    consoleSpy.mockRestore();
-  });
-});
-
-describe("postFollowUpAck", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("posts ack comment with message quoted", async () => {
-    mockCreateComment.mockResolvedValueOnce({ data: { id: 2, html_url: "https://url" } });
-
-    await postFollowUpAck("test-token", "owner/repo", 42, "explain X");
-
-    expect(mockCreateComment).toHaveBeenCalledWith({
-      owner: "owner",
-      repo: "repo",
-      issue_number: 42,
-      body: expect.any(String),
-    });
-
-    const body = mockCreateComment.mock.calls[0]![0].body as string;
-    expect(body).toContain('"explain X"');
-    expect(body).toContain("[KITTEN-TEST]");
-    expect(body).toContain("Follow-up processing with LLM available in v3.");
-  });
-
-  it("does NOT throw on API error (non-fatal)", async () => {
-    mockCreateComment.mockRejectedValueOnce(
-      Object.assign(new Error("Unprocessable"), { status: 422 }),
-    );
-
-    await expect(
-      postFollowUpAck("test-token", "owner/repo", 42, "some message"),
-    ).resolves.toBeUndefined();
-  });
-
-  it("logs error on API failure", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    mockCreateComment.mockRejectedValueOnce(
-      Object.assign(new Error("Unprocessable"), { status: 422 }),
-    );
-
-    await postFollowUpAck("test-token", "owner/repo", 42, "some message");
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to post follow-up ack"),
     );
     consoleSpy.mockRestore();
   });

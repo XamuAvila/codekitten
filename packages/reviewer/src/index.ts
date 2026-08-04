@@ -5,6 +5,7 @@ import { runPipeline } from "./pipeline.js";
 import { startAgent } from "./agent.js";
 import { reportStatus } from "./redis/status.js";
 import { subscribeToChannel } from "./redis/pubsub.js";
+import { postReviewComment } from "./github/comment.js";
 import type { PipelineConfig } from "./types.js";
 
 /**
@@ -116,7 +117,7 @@ export async function main(): Promise<void> {
     console.log("[reviewer] stop received — shutting down");
     try {
       await reportStatus(redis, config.jobId, "cancelled");
-      await postReviewComment(config.token, config.repo, config.prNumber, "Review cancelled");
+      await postCancellationComment(config.token, config.repo, config.prNumber, "Review cancelled");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[reviewer] Stop cleanup error: ${message}`);
@@ -145,23 +146,29 @@ export async function main(): Promise<void> {
   });
 }
 
-/** Posts a plain cancellation notice comment (non-fatal). */
-async function postReviewComment(
+/**
+ * Posts a plain cancellation notice comment (non-fatal). Deliberately named
+ * differently from the module-level `postReviewComment` (github/comment.ts):
+ * that one takes a `ReviewCommentData` summary, this one takes a plain body.
+ * Shadowing the module export with an incompatible signature was the footgun
+ * this rename removes — both read as "post a comment" but accept different
+ * arguments, so one name must not serve both.
+ */
+async function postCancellationComment(
   token: string,
   repo: string,
   prNumber: number,
   body: string,
 ): Promise<void> {
-  const { Octokit } = await import("@octokit/rest");
-  const [owner, repoName] = repo.split("/");
-  if (!owner || !repoName) return;
   try {
-    const octokit = new Octokit({ auth: token });
-    await octokit.issues.createComment({
-      owner,
-      repo: repoName,
-      issue_number: prNumber,
-      body: `🐱 **Kitten** [KITTEN-TEST]\n\n${body}`,
+    await postReviewComment(token, repo, prNumber, {
+      repo,
+      prNumber,
+      fileCount: { total: 0, analyzed: 0, skipped: 0 },
+      tokenEstimate: 0,
+      model: "",
+      diff: { insertions: 0, deletions: 0 },
+      findingsBody: `🐱 **Kitten** [KITTEN-TEST]\n\n${body}`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
