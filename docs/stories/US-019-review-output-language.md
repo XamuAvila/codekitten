@@ -1,7 +1,7 @@
 ---
 id: US-019
 title: "Review Output in the Configured Language"
-status: draft
+status: done
 epic: v3-llm-integration
 ---
 

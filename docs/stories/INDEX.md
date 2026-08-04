@@ -24,5 +24,5 @@
 | US-016 | Stop Review | done | v3-llm-integration |
 | US-017 | Contextual Follow-Up Answers | done | v3-llm-integration |
 | US-018 | Custom Review Rules Applied | done | v3-llm-integration |
-| US-019 | Review Output in the Configured Language | draft | v3-llm-integration |
+| US-019 | Review Output in the Configured Language | done | v3-llm-integration |
 | US-020 | Blocking Review Mode | draft | v3-llm-integration |

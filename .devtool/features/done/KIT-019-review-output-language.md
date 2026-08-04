@@ -1,13 +1,13 @@
 ---
 id: "KIT-019"
-status: "in-progress"
+status: "done"
 priority: "medium"
 assignee: ""
 epic: "v3-llm-integration"
 dueDate: null
 created: "2026-08-04"
 modified: "2026-08-04"
-completedAt: null
+completedAt: "2026-08-04"
 labels: ["config", "prompt", "debt"]
 order: "c9"
 ---
@@ -76,3 +76,11 @@ See [US-019](../../docs/stories/US-019-review-output-language.md).
 - **Manual verification**: set `language: pt` in `XamuAvila/kitten-test-repo`'s `.reviewer.yml`, push a branch with a deliberate bug (e.g. an unawaited promise), and run a review on minikube. Expect the posted PR review to carry findings whose text and suggestions are in Portuguese. Then send a follow-up: `curl -X POST "$DISPATCHER_URL/review/<jobId>/message" -H "Content-Type: application/json" -d '{"message":"explique o primeiro finding","sender":"dev"}'` → the answer comment is in Portuguese.
 - **Negative check**: on that same `language: pt` run, three things must NOT happen — (1) the `severity` column must still read `critical`/`high`/`medium`/`low`, never translated (a translated value would have failed `FindingSchema` and surfaced as `LLM_OUTPUT_INVALID` in the Pod logs); (2) the review body's `Actionable comments posted:` line stays English; (3) the budget-exceeded notice, if triggered, stays English per decision 4.
 - **Done means**: `pnpm test && pnpm lint && pnpm build` all green, AND a `language: pt` review returns Portuguese finding prose with canonical English `severity` values and English Kitten notices.
+
+## Completion notes (2026-08-04)
+
+- `pnpm test` → 30 files, 209 tests passing (203 → 209: 3 prompt tests, 1 agent guard, 2 pipeline guards).
+- `pnpm build` → exit 0. `pnpm lint` on this card's changed files → exit 0; repo-wide lint still exits 1 for the pre-existing reasons tracked in [KIT-021](KIT-021-fix-pre-existing-lint-errors.md).
+- **Deviation from the plan, deliberate:** step 4 originally listed `ruleId` among the untranslatable fields. That broke KIT-018's guarantee that a repo declaring no rules never sees "ruleId" in its prompt. Fixed in the source rather than by loosening KIT-018's test: `ruleId` is governed by the conditional REPOSITORY RULES block, so naming it again in LANGUAGE was both redundant and harmful.
+- Steps 6 and 8 added guards only — no production code — because the pass-through from `PipelineResult.prompt` to `adapter.respond` and the English-notice routing were both already correct. Written as regression locks, not as RED→GREEN cycles, and honest about that.
+- Manual verification on minikube (`language: pt` review + Portuguese follow-up) was **not** run — needs a live cluster and LLM keys. Still outstanding, along with AC-1/AC-2/AC-5, which only a real model call can prove.
