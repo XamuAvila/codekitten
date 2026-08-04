@@ -1,7 +1,7 @@
 ---
 id: US-022
 title: "Dead Comment Code Removed"
-status: draft
+status: done
 epic: v3-llm-integration
 ---
 

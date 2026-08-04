@@ -1,13 +1,13 @@
 ---
 id: "KIT-022"
-status: "in-progress"
+status: "done"
 priority: "low"
 assignee: ""
 epic: "v3-llm-integration"
 dueDate: null
 created: "2026-08-04"
 modified: "2026-08-04"
-completedAt: null
+completedAt: "2026-08-04"
 labels: ["cleanup", "debt"]
 order: "c13"
 ---
@@ -70,3 +70,11 @@ See [US-022](../../docs/stories/US-022-remove-dead-comment-code.md).
 - **Manual verification**: `rtk proxy grep -rn "postFollowUpAck\|formatFindingsComment\|formatFollowUpAck" packages/ --include=*.ts` → **zero matches** in `src/` and `tests/`.
 - **Negative check**: `postFollowUpAnswer` and `postReviewComment` are still exported and used — `rtk proxy grep -rn "postFollowUpAnswer\|postReviewComment" packages/reviewer/src/` shows both, and `agent.ts:150` / `pipeline.ts:191` still call them. The cancellation path (`index.ts:119`) still posts a comment with the `[KITTEN-TEST]` prefix.
 - **Done means**: `pnpm test && pnpm build` green, eslint on the 3 changed files exits 0, and `postFollowUpAck`/`formatFollowUpAck`/`formatFindingsComment` have zero matches in `packages/reviewer/src/` and `packages/reviewer/tests/`.
+
+## Completion notes (2026-08-04)
+
+- `pnpm lint` → exit 0, `pnpm test` → 30 files, 213 tests passing (was 216 — the 3 removed `postFollowUpAck` describe tests), `pnpm build` → exit 0.
+- **The dead `postFollowUpAck` mock was already gone** — removed in KIT-021, which needed it to fix the lint. KIT-022's plan step for that mock was a no-op; the `agent.test.ts` assertion was dropped there too.
+- `formatFindingsComment` removal left the `Finding` import unused in `comment.ts`; removed it (would have been a lint error otherwise).
+- **Shadow replacement:** `index.ts:149-170`'s local `postReviewComment` (body: string) → `postCancellationComment` (body: string) delegating to the module-level `postReviewComment` (ReviewCommentData). The `index.ts:119` cancellation call now goes through the correct signature.
+- Verified: dead code has zero matches in `src/`+`tests/`; live `postReviewComment`/`postFollowUpAnswer` remain and their callers (pipeline, agent) are intact.

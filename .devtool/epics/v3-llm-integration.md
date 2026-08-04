@@ -70,11 +70,13 @@ no `ReviewerConfig` field is inert any more.
 
 | Card | Story | Scope |
 |---|---|---|
-| [KIT-021](../features/KIT-021-fix-pre-existing-lint-errors.md) | [US-021](../../docs/stories/US-021-clean-lint-errors.md) | Fix 47 pre-existing lint errors in `agent.test.ts`, `pubsub.test.ts`, `error-handler.ts` — `pnpm lint` exits 0 |
-| [KIT-022](../features/KIT-022-remove-dead-comment-code.md) | [US-022](../../docs/stories/US-022-remove-dead-comment-code.md) | Remove `postFollowUpAck`, `formatFollowUpAck`, `formatFindingsComment` and the shadowed local `postReviewComment` in `index.ts` |
+| [KIT-021](../features/done/KIT-021-fix-pre-existing-lint-errors.md) | [US-021](../../docs/stories/US-021-clean-lint-errors.md) | Fix 47 pre-existing lint errors in `agent.test.ts`, `pubsub.test.ts`, `error-handler.ts` — `pnpm lint` exits 0 |
+| [KIT-022](../features/done/KIT-022-remove-dead-comment-code.md) | [US-022](../../docs/stories/US-022-remove-dead-comment-code.md) | Remove `postFollowUpAck`, `formatFollowUpAck`, `formatFindingsComment` and the shadowed local `postReviewComment` in `index.ts` |
 
-KIT-021 (c12) lands before KIT-022 (c13): KIT-022 touches `agent.test.ts`, and
-it should work on a lint-clean file.
+Both done as of 2026-08-04. KIT-021 shipped first: `pnpm lint` now exits 0 and
+is a usable gate. KIT-022 removed the dead helpers and the shadowed
+`postReviewComment`; the lint-clean ordering let it land without fighting
+`agent.test.ts`.
 
 ## Architecture
 

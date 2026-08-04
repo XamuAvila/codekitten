@@ -27,4 +27,4 @@
 | US-019 | Review Output in the Configured Language | done | v3-llm-integration |
 | US-020 | Blocking Review Mode | done | v3-llm-integration |
 | US-021 | Lint Clean: Pre-Existing Errors Fixed | done | v3-llm-integration |
-| US-022 | Dead Comment Code Removed | draft | v3-llm-integration |
+| US-022 | Dead Comment Code Removed | done | v3-llm-integration |
