@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { PubSubMessage } from "@kitten/shared";
+import type { Redis } from "ioredis";
+
+/** Minimal shape the subscriber needs — subscribe/unsubscribe/on/quit. */
+type MockSubscriber = Pick<Redis, "subscribe" | "unsubscribe" | "on" | "quit">;
 
 // --- Mock ioredis ---
 const mockSubscribe = vi.fn().mockResolvedValue(undefined);
@@ -93,7 +96,7 @@ describe("subscribeToChannel", () => {
       quit: mockQuit,
     };
 
-    await subscribeToChannel(mockSubscriber as any, "review:job-1:messages", handler);
+    await subscribeToChannel(mockSubscriber as MockSubscriber, "review:job-1:messages", handler);
 
     expect(mockSubscribe).toHaveBeenCalledWith("review:job-1:messages");
   });
@@ -115,7 +118,7 @@ describe("subscribeToChannel", () => {
       quit: mockQuit,
     };
 
-    await subscribeToChannel(mockSubscriber as any, "review:job-1:messages", handler);
+    await subscribeToChannel(mockSubscriber as MockSubscriber, "review:job-1:messages", handler);
 
     expect(capturedMessageHandler).toBeDefined();
 
@@ -143,7 +146,7 @@ describe("subscribeToChannel", () => {
       quit: mockQuit,
     };
 
-    const sub = await subscribeToChannel(mockSubscriber as any, "review:job-1:messages", handler);
+    const sub = await subscribeToChannel(mockSubscriber as MockSubscriber, "review:job-1:messages", handler);
 
     expect(sub.unsubscribe).toBeDefined();
     await sub.unsubscribe();

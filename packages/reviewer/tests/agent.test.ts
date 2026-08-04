@@ -34,17 +34,18 @@ vi.mock("ioredis", () => {
     Redis: class MockRedis {
       quit = (...args: unknown[]) => mockRedisQuit(...args);
       duplicate = () => createInstance();
+      // `new Redis(url)` — the url arg is required by the real constructor but
+      // unused in the mock. `_url` alone does not silence the rule here.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       constructor(_url?: string) {}
     },
   };
 });
 
 // --- Mock github/comment ---
-const mockPostFollowUpAck = vi.fn().mockResolvedValue(undefined);
 const mockPostFollowUpAnswer = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../src/github/comment.js", () => ({
-  postFollowUpAck: (...args: unknown[]) => mockPostFollowUpAck(...args),
   postFollowUpAnswer: (...args: unknown[]) => mockPostFollowUpAnswer(...args),
 }));
 
@@ -63,7 +64,7 @@ vi.mock("@kitten/shared", async (importOriginal) => {
 });
 
 // --- Mock process.exit ---
-const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {}) as any);
+const mockExit = vi.spyOn(process, "exit").mockImplementation((() => {}) as () => never);
 
 import { startAgent } from "../src/agent.js";
 import type { AgentConfig } from "../src/agent.js";
@@ -141,8 +142,9 @@ describe("startAgent", () => {
 
   it("resets idle timer on follow_up message", async () => {
     // Capture the handler passed to subscribeToChannel
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });
@@ -172,8 +174,9 @@ describe("startAgent", () => {
   });
 
   it("increments follow-up counter on follow_up message", async () => {
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });
@@ -197,8 +200,9 @@ describe("startAgent", () => {
   });
 
   it("exits immediately on shutdown message", async () => {
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });
@@ -225,8 +229,9 @@ describe("startAgent", () => {
   });
 
   it("dispatches force command to onForce exactly once", async () => {
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });
@@ -249,8 +254,9 @@ describe("startAgent", () => {
   });
 
   it("does not dispatch onForce for a regular follow-up question", async () => {
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });
@@ -273,8 +279,9 @@ describe("startAgent", () => {
   });
 
   it("dispatches stop command to onStop exactly once", async () => {
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });
@@ -297,8 +304,9 @@ describe("startAgent", () => {
   });
 
   it("does not dispatch onStop for a regular follow-up question", async () => {
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });
@@ -321,8 +329,9 @@ describe("startAgent", () => {
   });
 
   it("answers a follow-up question with the LLM using review context", async () => {
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });
@@ -375,7 +384,6 @@ describe("startAgent", () => {
     expect(maxTokens).toBeGreaterThan(0);
 
     expect(mockPostFollowUpAnswer).toHaveBeenCalledWith("token", "org/repo", 5, "The change moves validation to the service layer.");
-    expect(mockPostFollowUpAck).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(5000);
     await agentPromise;
@@ -444,8 +452,9 @@ describe("startAgent", () => {
   });
 
   it("keeps the agent alive when the follow-up LLM call fails", async () => {
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });
@@ -475,8 +484,9 @@ describe("startAgent", () => {
   });
 
   it("matches force case-insensitively with surrounding whitespace", async () => {
-    let capturedHandler: ((msg: any) => void) | undefined;
-    mockSubscribeToChannel.mockImplementation(async (_sub: any, _ch: any, handler: any) => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
       capturedHandler = handler;
       return { unsubscribe: mockUnsubscribe };
     });

@@ -9,6 +9,10 @@ export function errorHandler(
   err: Error,
   _req: Request,
   res: Response,
+  // `next` must stay in the signature even though it is unused: Express
+  // dispatches error handlers by arity — a 3-argument handler is treated as a
+  // normal route and errors would fall through to the default handler.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
 ) {
   if (err instanceof AppError) {
