@@ -252,9 +252,52 @@ describe("runPipeline", () => {
     expect(mockCreateReview).toHaveBeenCalledTimes(1);
     expect(mockCreateComment).not.toHaveBeenCalled();
     const [params] = mockCreateReview.mock.calls[0];
-    expect(params.state).toBe("COMMENTED");
+    expect(params.event).toBe("COMMENT");
+    expect(params).not.toHaveProperty("state");
     expect(params.body).not.toContain("DRY RUN");
     expect(params.body).toContain("[KITTEN-TEST]");
+  });
+
+  it("submits REQUEST_CHANGES when .reviewer.yml sets blocking: request_changes", async () => {
+    mockExistsSync.mockImplementation((path: unknown) =>
+      typeof path === "string" && path.endsWith(".reviewer.yml"),
+    );
+    mockReadFileSync.mockReturnValue("reviewer:\n  blocking: request_changes\n");
+    mockReview.mockResolvedValue(
+      llmReviewResult([{ severity: "high", file: "src/app.ts", line: 1, finding: "Bug" }]),
+    );
+
+    await runPipeline(baseConfig);
+
+    expect(mockCreateReview).toHaveBeenCalledTimes(1);
+    expect(mockCreateReview.mock.calls[0][0].event).toBe("REQUEST_CHANGES");
+  });
+
+  it("never blocks a PR that produced zero findings", async () => {
+    mockExistsSync.mockImplementation((path: unknown) =>
+      typeof path === "string" && path.endsWith(".reviewer.yml"),
+    );
+    mockReadFileSync.mockReturnValue("reviewer:\n  blocking: request_changes\n");
+    mockReview.mockResolvedValue(llmReviewResult([]));
+
+    await runPipeline(baseConfig);
+
+    expect(mockCreateReview).not.toHaveBeenCalled();
+    expect(mockCreateComment).toHaveBeenCalledTimes(1);
+  });
+
+  it("never blocks a PR whose review was aborted before any chunk ran", async () => {
+    mockExistsSync.mockImplementation((path: unknown) =>
+      typeof path === "string" && path.endsWith(".reviewer.yml"),
+    );
+    mockReadFileSync.mockReturnValue("reviewer:\n  blocking: request_changes\n");
+
+    const controller = new AbortController();
+    controller.abort();
+
+    await runPipeline(baseConfig, { signal: controller.signal });
+
+    expect(mockCreateReview).not.toHaveBeenCalled();
   });
 
   it("posts an issue comment (no PR review) when there are zero findings", async () => {

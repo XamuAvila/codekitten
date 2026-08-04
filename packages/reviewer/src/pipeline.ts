@@ -204,8 +204,12 @@ export async function runPipeline(
         config.prNumber,
         result.findings,
         filePatches,
+        reviewerConfig.config.blocking,
       );
-      console.log(`[reviewer] PR review posted: ${posted.postedInline} inline, ${posted.inTable} in table`);
+      console.log(
+        `[reviewer] PR review posted: ${posted.postedInline} inline, ${posted.inTable} in table, ` +
+        `event=${posted.event}${posted.downgraded ? " (downgraded from REQUEST_CHANGES)" : ""}`,
+      );
       if (chunkWarning) {
         // Failed chunks noted as a follow-up comment (US-014 AC-4)
         await postReviewComment(config.token, config.repo, config.prNumber, {
