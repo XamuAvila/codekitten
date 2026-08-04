@@ -526,6 +526,44 @@ describe("runPipeline", () => {
     expect(result.findings![1].ruleId).toBeUndefined();
   });
 
+  it("keeps the no-issues notice in English when another language is configured", async () => {
+    mockExistsSync.mockImplementation((path: unknown) =>
+      typeof path === "string" && path.endsWith(".reviewer.yml"),
+    );
+    mockReadFileSync.mockReturnValue("reviewer:\n  language: pt\n");
+    mockReview.mockResolvedValue(llmReviewResult([]));
+
+    await runPipeline(baseConfig);
+
+    const body = (mockCreateComment.mock.calls[0][0] as { body: string }).body;
+    expect(body).toMatch(/no issues found/i);
+  });
+
+  it("keeps the budget notice in English when another language is configured", async () => {
+    mockExistsSync.mockImplementation((path: unknown) => {
+      if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;
+      if (typeof path === "string" && (path.endsWith("src/app.ts") || path.endsWith("src/utils.ts"))) return true;
+      return false;
+    });
+    mockReadFileSync.mockImplementation((path: string) => {
+      if (path.endsWith(".reviewer.yml")) return "reviewer:\n  language: pt\n  max_context_tokens: 10\n";
+      if (path.endsWith("src/app.ts")) return "export const app = () => 1;";
+      return "export const util = () => 2;";
+    });
+    mockListFiles.mockResolvedValue({
+      data: [
+        { filename: "src/app.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+        { filename: "src/utils.ts", status: "modified", patch: "@@ -1 +1 @@", additions: 1, deletions: 0, changes: 1, blob_url: "u", raw_url: "u" },
+      ],
+    });
+    mockReview.mockResolvedValue(llmReviewResult([]));
+
+    await runPipeline(baseConfig);
+
+    const bodies = mockCreateComment.mock.calls.map((c) => (c[0] as { body: string }).body);
+    expect(bodies.some((b) => b.match(/exceeds the token budget/i))).toBe(true);
+  });
+
   it("posts a budget question comment when over the budget", async () => {
     mockExistsSync.mockImplementation((path: unknown) => {
       if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;

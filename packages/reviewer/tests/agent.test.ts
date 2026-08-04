@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { PubSubMessage } from "@kitten/shared";
 
 // --- Mock redis/pubsub ---
 const mockUnsubscribe = vi.fn().mockResolvedValue(undefined);
@@ -375,6 +376,68 @@ describe("startAgent", () => {
 
     expect(mockPostFollowUpAnswer).toHaveBeenCalledWith("token", "org/repo", 5, "The change moves validation to the service layer.");
     expect(mockPostFollowUpAck).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await agentPromise;
+  });
+
+  it("hands the review system prompt, language rule included, to the follow-up call", async () => {
+    // The agent never rebuilds the prompt — it replays the one the pipeline
+    // produced. This locks that pass-through so a future refactor cannot
+    // answer follow-ups in a different language than the review itself.
+    // Typed rather than `any` like its neighbours: this file already carries
+    // 42 no-explicit-any errors (KIT-021) and new tests should not add more.
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
+        capturedHandler = handler;
+        return { unsubscribe: mockUnsubscribe };
+      },
+    );
+
+    mockRespond.mockResolvedValue("Resposta em portugues.");
+    mockCreateLlmAdapter.mockReturnValue({ review: vi.fn(), respond: mockRespond });
+
+    const agentPromise = startAgent({
+      ...baseConfig,
+      token: "token",
+      repo: "org/repo",
+      prNumber: 5,
+      reviewContext: {
+        findings: [],
+        prompt: {
+          system: 'LANGUAGE:\n- Write every piece of prose you author in "pt".',
+          user: "diff + files",
+        },
+      },
+      llmConfig: {
+        provider: "anthropic" as const,
+        baseUrl: "https://api.deepseek.com/anthropic",
+        model: "deepseek-v4-flash",
+        maxContextTokens: 1_000_000,
+        maxOutputTokens: 16_000,
+        maxFindings: 20,
+        maxComplexity: 10,
+        language: "pt",
+        trigger: "@reviewer",
+        blocking: "comment_only" as const,
+        skip: [],
+        conventionsFile: "CLAUDE.md",
+        rules: [],
+      },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    capturedHandler!({
+      type: "follow_up",
+      payload: { message: "explique o primeiro finding", sender: "alice" },
+      timestamp: "2026-08-04T00:00:00Z",
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    const [system] = mockRespond.mock.calls[0];
+    expect(system).toContain("LANGUAGE:");
+    expect(system).toContain('"pt"');
 
     await vi.advanceTimersByTimeAsync(5000);
     await agentPromise;
