@@ -16,10 +16,10 @@
 | US-008 | Agent Lifecycle Management | done | v2-github-integration |
 | US-009 | PR Comment Posting | done | v2-github-integration |
 | US-010 | End-to-End Review Flow | done | v2-github-integration |
-| US-011 | LLM Review with Real Findings | draft | v3-llm-integration |
-| US-012 | Multi-Vendor Provider Configuration | draft | v3-llm-integration |
-| US-013 | Inline Diff Comments on PR | draft | v3-llm-integration |
-| US-014 | Chunked Multi-Round Review | draft | v3-llm-integration |
-| US-015 | Force Full Review | draft | v3-llm-integration |
-| US-016 | Stop Review | draft | v3-llm-integration |
-| US-017 | Contextual Follow-Up Answers | draft | v3-llm-integration |
+| US-011 | LLM Review with Real Findings | done | v3-llm-integration |
+| US-012 | Multi-Vendor Provider Configuration | done | v3-llm-integration |
+| US-013 | Inline Diff Comments on PR | done | v3-llm-integration |
+| US-014 | Chunked Multi-Round Review | done | v3-llm-integration |
+| US-015 | Force Full Review | done | v3-llm-integration |
+| US-016 | Stop Review | done | v3-llm-integration |
+| US-017 | Contextual Follow-Up Answers | done | v3-llm-integration |

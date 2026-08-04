@@ -486,8 +486,7 @@ describe("runPipeline", () => {
     const controller = new AbortController();
     controller.abort(); // aborted before any call
 
-    const config = { ...baseConfig, signal: controller.signal };
-    await runPipeline(config);
+    await runPipeline(baseConfig, { signal: controller.signal });
 
     expect(callCount).toBe(0);
   });

@@ -1,7 +1,7 @@
 ---
 id: v3-llm-integration
 title: "v3: LLM Integration"
-status: in-progress
+status: done
 created: "2026-08-03"
 ---
 

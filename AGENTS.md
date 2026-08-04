@@ -4,7 +4,7 @@
 
 AI Code Review Agent (White Label Reviewer). Ephemeral worker per PR with isolated clone — reviews PRs using full repo context + diff + team conventions. White-label, vendor-agnostic, self-hosted.
 
-Full design and locked decisions: `.devtool/epics/v1-scaffolding-dry-run.md` (the v1 epic). **Read the epic before any architecture change.** What is not in it does not enter v1 (out-of-scope section lists what is excluded).
+Full design and locked decisions live in `.devtool/epics/` — read the **latest active epic** (`v3-llm-integration.md` as of v3) before any architecture change. Earlier epics (`v1-scaffolding-dry-run`, `v2-github-integration`) are done and kept as history. What is not in the current epic does not enter its scope (each epic's out-of-scope section lists what is excluded).
 
 ## Language
 
@@ -97,30 +97,33 @@ curl http://localhost:3001/health
 docker compose down
 
 # --- Option B: full stack on minikube (required to actually run a review) ---
-# Prerequisite: minikube >= 1.30. Seeds the Secret from $GITHUB_TOKEN when set.
-GITHUB_TOKEN=<token> ./scripts/minikube-setup.sh
+# Prerequisite: minikube >= 1.30. Seeds the GitHub token and LLM keys Secrets
+# from the exported env vars. Without LLM keys the review fails at the LLM step.
+GITHUB_TOKEN=<token> ANTHROPIC_API_KEY=<key> DEEPSEEK_API_KEY=<key> \
+  ./scripts/minikube-setup.sh
 
 DISPATCHER_URL=$(minikube service kitten-dispatcher -n kitten --url)
 
-# Submit a review — creates a reviewer Pod
+# Submit a review — creates a reviewer Pod (real LLM review since v3)
 curl -X POST "$DISPATCHER_URL/review" \
   -H "Content-Type: application/json" \
-  -d '{"repo":"XamuAvila/kitten-test-repo","prNumber":1,"headRef":"test/add-feature","baseRef":"master","sender":"test"}'
-# → {"jobId":"review-xamuavila-kitten-test-repo-1","status":"queued"}
+  -d '{"repo":"XamuAvila/kitten-test-repo","prNumber":2,"headRef":"test/add-feature","baseRef":"master","sender":"test"}'
+# → {"jobId":"review-xamuavila-kitten-test-repo-2","status":"queued"}
 
 # Watch the reviewer Pod
-kubectl --context=minikube logs review-xamuavila-kitten-test-repo-1 -n kitten
-# → [reviewer] Clone complete / Diff: N files changed / DRY RUN — would send Xk tokens
+kubectl --context=minikube logs review-xamuavila-kitten-test-repo-2 -n kitten
+# → [reviewer] Clone complete / Diff: N files changed / Calling LLM ... / Posted findings
 
-# Poll status: queued → running → reviewing → completed
-curl "$DISPATCHER_URL/status/review-xamuavila-kitten-test-repo-1"
+# Poll status: queued → running → reviewing → completed (or cancelled via stop)
+curl "$DISPATCHER_URL/status/review-xamuavila-kitten-test-repo-2"
 
-# Send a follow-up to the live Pod (resets its idle timer)
-curl -X POST "$DISPATCHER_URL/review/review-xamuavila-kitten-test-repo-1/message" \
+# Send a follow-up / command to the live Pod (resets its idle timer)
+# Commands: "force" (full review without budget), "stop" (cancel, status cancelled)
+curl -X POST "$DISPATCHER_URL/review/review-xamuavila-kitten-test-repo-2/message" \
   -H "Content-Type: application/json" \
   -d '{"message":"explain the changes","sender":"dev"}'
 
-# Full lifecycle check (submit → comment → follow-up → idle shutdown)
+# Full lifecycle check (submit → LLM review → inline comments → follow-up → idle)
 IDLE_TIMEOUT=30 ./scripts/e2e-test.sh
 
 # Remove finished reviewer Pods

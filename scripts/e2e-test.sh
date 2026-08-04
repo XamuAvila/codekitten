@@ -9,7 +9,7 @@ set -euo pipefail
 # Prerequisites:
 #   - minikube running with kitten namespace (./scripts/minikube-setup.sh)
 #   - GITHUB_TOKEN set in kitten-github-token secret
-#   - Test repo: XamuAvila/kitten-test-repo with PR #1
+#   - Test repo: XamuAvila/kitten-test-repo with PR #2
 #
 # Usage:
 #   IDLE_TIMEOUT=30 ./scripts/e2e-test.sh
@@ -42,12 +42,12 @@ else
 fi
 
 # --- Step 2: Submit review ---
-info "Submitting review for XamuAvila/kitten-test-repo PR #1..."
+info "Submitting review for XamuAvila/kitten-test-repo PR #2..."
 RESPONSE=$(curl -sf -X POST "${DISPATCHER_URL}/review" \
   -H "Content-Type: application/json" \
   -d "{
     \"repo\": \"XamuAvila/kitten-test-repo\",
-    \"prNumber\": 1,
+    \"prNumber\": 2,
     \"headRef\": \"test/add-feature\",
     \"baseRef\": \"master\",
     \"sender\": \"e2e-test\"
