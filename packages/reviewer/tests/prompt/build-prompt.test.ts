@@ -114,4 +114,33 @@ describe("buildReviewPrompt", () => {
 
     expect(system).not.toContain("ruleId");
   });
+
+  it("system prompt names the configured output language", () => {
+    const config = { ...DEFAULT_CONFIG, language: "pt" };
+    const { system } = buildReviewPrompt(DIFF, FILES, config);
+
+    expect(system).toContain("LANGUAGE:");
+    expect(system).toContain('"pt"');
+  });
+
+  it("system prompt names the default language when none is configured", () => {
+    const { system } = buildReviewPrompt(DIFF, FILES, DEFAULT_CONFIG);
+
+    expect(system).toContain("LANGUAGE:");
+    expect(system).toContain(`"${DEFAULT_CONFIG.language}"`);
+  });
+
+  it("language block exempts machine-readable fields from translation", () => {
+    const config = { ...DEFAULT_CONFIG, language: "pt" };
+    const { system } = buildReviewPrompt(DIFF, FILES, config);
+
+    const block = system.slice(
+      system.indexOf("LANGUAGE:"),
+      system.indexOf("OUTPUT CONTRACT:"),
+    );
+
+    expect(block).toContain("severity");
+    expect(block).toContain("file");
+    expect(block).toContain("line");
+  });
 });

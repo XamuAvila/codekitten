@@ -55,6 +55,19 @@ export function buildReviewPrompt(
           "",
         ]
       : []),
+    // KIT-019. Worded as "prose you author" rather than "findings" on purpose:
+    // agent.ts reuses this same system prompt for free-text follow-up answers,
+    // which are not findings. Naming the machine-readable fields is not
+    // decoration — a model told to write Portuguese will happily return
+    // severity "alto", which fails FindingSchema and costs a retry.
+    "LANGUAGE:",
+    `- Write every piece of prose you author — finding descriptions, suggestions, and any free-text answer — in "${config.language}".`,
+    // `ruleId` is deliberately absent from this list: it only exists when the
+    // repo declares rules, and the REPOSITORY RULES block above already governs
+    // it. Naming it here would put "ruleId" in every prompt, including repos
+    // with no rules — exactly what that block is conditional to avoid.
+    "- Do NOT translate machine-readable values: `severity` stays exactly one of critical/high/medium/low, and `file` and `line` are copied verbatim.",
+    "",
     "OUTPUT CONTRACT:",
     "- Respond ONLY with the structured output (tool call / JSON schema).",
     "- No preamble, no explanations outside the structured output.",
