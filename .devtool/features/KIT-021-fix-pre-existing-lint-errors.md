@@ -16,10 +16,7 @@ order: "c11"
 
 ## User Story
 
-None yet — this is a chore, not a slice of user value. Per AGENTS.md a card
-needs a linked story plus a refinement before it moves to In Progress; both are
-outstanding. Discovered while closing [KIT-018](done/KIT-018-custom-review-rules.md),
-recorded immediately rather than left in someone's head.
+See [US-021](../../docs/stories/US-021-clean-lint-errors.md).
 
 ## Problem
 
@@ -55,8 +52,43 @@ the weak-typing the project standards forbid.
   explaining why, not deleting the parameter — deleting it would silently break
   error handling. Needs confirmation against the file before acting.
 
-## Not yet refined
+## Technical Refinement
 
-No `## Technical Refinement`, `## Implementation Plan`, or `## How to Test` yet —
-those get written via the `refine-task` skill once the questions above are
-answered. Do not move this card to In Progress before then.
+### Files
+
+**Modified:**
+- `packages/reviewer/tests/agent.test.ts` — 41× `no-explicit-any`
+- `packages/reviewer/tests/redis/pubsub.test.ts` — 3× `no-explicit-any`, 1× `no-unused-vars`
+- `packages/dispatcher/src/middleware/error-handler.ts` — 1× `no-unused-vars`
+
+### Consumes
+
+- The three files above, 47 errors total, verified at `master` `c374c4d` (pre-existing — not a regression).
+- Express's four-argument error-middleware contract (`next` must be present even when unused, or Express won't treat the handler as an error handler).
+
+### Design decisions
+
+1. **Fix the `any`s in `agent.test.ts` and `pubsub.test.ts` with typed mocks** — the mocks capture a handler and stub `subscribeToChannel`; `unknown`/`PubSubMessage` typing is mechanical and removes the `any` cleanly. Verified locally that a typed handler (`(msg: PubSubMessage) => void`) keeps the existing mock call signature working.
+2. **`error-handler.ts`: disable `no-unused-vars` for that parameter, don't delete it.** Deleting `next` from an Express error middleware silently breaks error handling — Express dispatches error handlers by arity. A targeted disable comment explains why.
+3. **No eslint config change.** The `any`s are a code-quality fix, not a style preference. A project-wide override (e.g. allow `any` in tests) would hide real issues. Rejected.
+
+### Risks
+
+1. **Vitest 4.1.10 rejection quirk** — a persistently-rejecting mock fails even inside `try/catch`; `mockRejectedValueOnce` works. If a typed mock touches the reject paths in `agent.test.ts`, use the Once form. (Observed in KIT-020.)
+2. **`error-handler.ts` semantics** — confirming the file is actually an Express error handler (4-arg) before applying the disable comment. Read it first.
+
+## Implementation Plan
+
+1. - [ ] Read `packages/dispatcher/src/middleware/error-handler.ts` — confirm 4-arg error handler.
+2. - [ ] **RED — clean `agent.test.ts`**: replace the `any`s in mocks with typed params (`PubSubMessage`, `unknown`). Run `npx vitest run packages/reviewer/tests/agent.test.ts` → FAIL (type errors), then fix types → PASS.
+3. - [ ] **RED — clean `pubsub.test.ts`**: same typed-mock treatment. Run → FAIL, fix → PASS.
+4. - [ ] **GREEN — `error-handler.ts`**: add the targeted disable comment for `next`.
+5. - [ ] Run `pnpm test && pnpm build` — all green. Run `npx eslint <3 files>` — **must now exit 0** (the proof this card works).
+6. - [ ] Commit: `chore: fix pre-existing lint errors in tests and error middleware`
+
+## How to Test
+
+- **Automated**: `npx eslint packages/reviewer/tests/agent.test.ts packages/reviewer/tests/redis/pubsub.test.ts packages/dispatcher/src/middleware/error-handler.ts` → **exit 0** (was 47 errors). `pnpm test` → all 216 green.
+- **Manual verification**: `pnpm lint` → exit 0 (was exit 1). The 3 files are the only remaining offenders.
+- **Negative check**: `error-handler.ts` must still function as an Express error handler — run the dispatcher's route tests (`packages/dispatcher/tests/middleware/error-handler.test.ts` if present, or `pnpm test`) to confirm error responses still work after the disable comment.
+- **Done means**: `npx eslint <3 files>` exits 0, `pnpm lint` exits 0, and no previously-green test turned red.

@@ -64,10 +64,17 @@ were specified in the config shape without a consuming card.
 | [KIT-020](../features/done/KIT-020-blocking-review-mode.md) | [US-020](../../docs/stories/US-020-blocking-review-mode.md) | `blocking: request_changes` submits `REQUEST_CHANGES`; 422 downgrades to `COMMENT`; clean and cancelled reviews never block |
 
 All three are done as of 2026-08-04 (branch `feat/v3-orphan-config-fields`), so
-no `ReviewerConfig` field is inert any more. One card came out of the work:
-[KIT-021](../features/KIT-021-fix-pre-existing-lint-errors.md) — `pnpm lint`
-already exited 1 on `master` at `c374c4d`, 47 errors in three files none of
-these cards touch. Not a regression, and deliberately not fixed inline.
+no `ReviewerConfig` field is inert any more.
+
+### Cleanup and debt (opened 2026-08-04)
+
+| Card | Story | Scope |
+|---|---|---|
+| [KIT-021](../features/KIT-021-fix-pre-existing-lint-errors.md) | [US-021](../../docs/stories/US-021-clean-lint-errors.md) | Fix 47 pre-existing lint errors in `agent.test.ts`, `pubsub.test.ts`, `error-handler.ts` — `pnpm lint` exits 0 |
+| [KIT-022](../features/KIT-022-remove-dead-comment-code.md) | [US-022](../../docs/stories/US-022-remove-dead-comment-code.md) | Remove `postFollowUpAck`, `formatFollowUpAck`, `formatFindingsComment` and the shadowed local `postReviewComment` in `index.ts` |
+
+KIT-021 (c12) lands before KIT-022 (c13): KIT-022 touches `agent.test.ts`, and
+it should work on a lint-clean file.
 
 ## Architecture
 
