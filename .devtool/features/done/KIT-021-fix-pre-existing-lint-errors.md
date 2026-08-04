@@ -1,13 +1,13 @@
 ---
 id: "KIT-021"
-status: "in-progress"
+status: "done"
 priority: "medium"
 assignee: ""
 epic: "v3-llm-integration"
 dueDate: null
 created: "2026-08-04"
 modified: "2026-08-04"
-completedAt: null
+completedAt: "2026-08-04"
 labels: ["chore", "lint", "debt", "needs-refinement"]
 order: "c11"
 ---
@@ -92,3 +92,10 @@ the weak-typing the project standards forbid.
 - **Manual verification**: `pnpm lint` → exit 0 (was exit 1). The 3 files are the only remaining offenders.
 - **Negative check**: `error-handler.ts` must still function as an Express error handler — run the dispatcher's route tests (`packages/dispatcher/tests/middleware/error-handler.test.ts` if present, or `pnpm test`) to confirm error responses still work after the disable comment.
 - **Done means**: `npx eslint <3 files>` exits 0, `pnpm lint` exits 0, and no previously-green test turned red.
+
+## Completion notes (2026-08-04)
+
+- `pnpm lint` → **exit 0** (first time in the repo). `pnpm test` → 30 files, 216 tests, all passing. `pnpm build` → exit 0.
+- Fixes: `agent.test.ts` (typed the 12 `any` mock annotations, silenced the unused constructor arg with a disable comment — `_url` prefix alone does not satisfy the rule here); `pubsub.test.ts` (typed the subscriber mocks with a `MockSubscriber` pick of `Redis`); `error-handler.ts` (`next` stays in the signature with a disable comment — Express dispatches error handlers by arity, deleting it would break error handling).
+- **KIT-022 change landed early:** the dead `mockPostFollowUpAck` was removed here, not in KIT-022. The two cards collided — KIT-022 removes `postFollowUpAck` from `comment.ts`, and the test still asserted `mockPostFollowUpAck).not.toHaveBeenCalled()` at `agent.test.ts:384`, so the lint fix could not complete without dropping the now-dead mock and its assertion first. KIT-022's plan step for the mock removal is now a no-op.
+- `pnpm lint` is now a reliable gate for every future card's Done-means clause.

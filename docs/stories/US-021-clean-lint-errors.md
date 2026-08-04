@@ -1,7 +1,7 @@
 ---
 id: US-021
 title: "Lint Clean: Pre-Existing Errors Fixed"
-status: draft
+status: done
 epic: v3-llm-integration
 ---
 

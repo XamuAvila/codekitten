@@ -1,6 +1,6 @@
 ---
 id: "KIT-022"
-status: "backlog"
+status: "in-progress"
 priority: "low"
 assignee: ""
 epic: "v3-llm-integration"
