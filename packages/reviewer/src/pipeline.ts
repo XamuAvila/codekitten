@@ -142,9 +142,13 @@ export async function runPipeline(
     if (successful.length === 0 && chunks.length === 1) {
       throw results[0]?.error ?? new Error("LLM review failed");
     }
+    // Rule ids the repo actually declared — findings attributed to anything
+    // else lose the attribution during consolidation (KIT-018, US-018 AC-5).
+    const declaredRuleIds = new Set(reviewerConfig.config.rules.map((rule) => rule.id));
+
     const result: ReviewResult = successful.length > 0
       ? {
-          findings: consolidateFindings(successful),
+          findings: consolidateFindings(successful, declaredRuleIds),
           contextChecked: successful[0]?.contextChecked ?? [],
           conventionsStatus: successful[0]?.conventionsStatus ?? [],
           metadata: {

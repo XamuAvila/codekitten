@@ -491,6 +491,41 @@ describe("runPipeline", () => {
     expect(callCount).toBe(0);
   });
 
+  it("passes .reviewer.yml rules into the prompt sent to the LLM", async () => {
+    mockExistsSync.mockImplementation((path: unknown) =>
+      typeof path === "string" && path.endsWith(".reviewer.yml"),
+    );
+    mockReadFileSync.mockReturnValue(
+      "reviewer:\n  rules:\n    - id: no-raw-sql\n      description: Use the query builder.\n",
+    );
+
+    await runPipeline(baseConfig);
+
+    const [context] = mockReview.mock.calls[0];
+    expect(context.prompt.user).toContain("- no-raw-sql: Use the query builder.");
+  });
+
+  it("strips finding rule attribution that matches no rule in .reviewer.yml", async () => {
+    mockExistsSync.mockImplementation((path: unknown) =>
+      typeof path === "string" && path.endsWith(".reviewer.yml"),
+    );
+    mockReadFileSync.mockReturnValue(
+      "reviewer:\n  rules:\n    - id: no-raw-sql\n      description: Use the query builder.\n",
+    );
+    mockReview.mockResolvedValue(
+      llmReviewResult([
+        { severity: "high", file: "src/app.ts", line: 1, finding: "Raw SQL", ruleId: "no-raw-sql" },
+        { severity: "low", file: "src/app.ts", line: 2, finding: "Other", ruleId: "invented-rule" },
+      ]),
+    );
+
+    const result = await runPipeline(baseConfig);
+
+    expect(result.findings).toHaveLength(2);
+    expect(result.findings![0].ruleId).toBe("no-raw-sql");
+    expect(result.findings![1].ruleId).toBeUndefined();
+  });
+
   it("posts a budget question comment when over the budget", async () => {
     mockExistsSync.mockImplementation((path: unknown) => {
       if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;
