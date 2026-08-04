@@ -75,7 +75,7 @@ export async function postPrReview(
           "|---|---|---|---|",
           ...tableFindings.map(
             (f) =>
-              `| ${f.severity} | ${f.file}:${f.line} | ${f.finding} | ${f.suggestion ?? "-"} |`,
+              `| ${severityLabel(f)} | ${f.file}:${f.line} | ${f.finding} | ${f.suggestion ?? "-"} |`,
           ),
         ]
       : []),
@@ -106,7 +106,18 @@ export async function postPrReview(
 
 function formatInlineComment(finding: Finding): string {
   return [
-    `:warning: **${finding.severity}** — ${finding.finding}`,
+    `:warning: **${severityLabel(finding)}** — ${finding.finding}`,
     ...(finding.suggestion ? [`\n\`\`\`suggestion\n${finding.suggestion}\n\`\`\``] : []),
   ].join("\n");
+}
+
+/**
+ * Severity, plus the rule that produced the finding when one is attributed
+ * (KIT-018, US-018 AC-4). Shared by the inline comment and the table row so
+ * both surfaces name the rule the same way. Attribution is already validated
+ * against `.reviewer.yml` during consolidation, so whatever arrives here is a
+ * declared id.
+ */
+function severityLabel(finding: Finding): string {
+  return finding.ruleId ? `${finding.severity} (${finding.ruleId})` : finding.severity;
 }

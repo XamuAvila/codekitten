@@ -93,4 +93,41 @@ describe("postPrReview", () => {
     expect(params.comments).toEqual([]);
     expect(params.body).toContain("**Actionable comments posted: 0**");
   });
+
+  it("shows the rule id on both the inline comment and the table row", async () => {
+    mockCreateReview.mockResolvedValue({ data: { id: 1 } });
+
+    const attributed = [
+      { severity: "high" as const, file: "src/app.ts", line: 16, finding: "Raw SQL", suggestion: "Use the builder", ruleId: "no-raw-sql" },
+      { severity: "low" as const, file: "src/app.ts", line: 9999, finding: "Off diff", ruleId: "no-console-log" },
+    ];
+
+    await postPrReview(
+      "token",
+      "octocat/Hello-World",
+      42,
+      attributed,
+      new Map([["src/app.ts", ADDED_HUNK]]),
+    );
+
+    const [params] = mockCreateReview.mock.calls[0];
+    expect(params.comments[0].body).toContain("no-raw-sql");
+    expect(params.body).toContain("no-console-log");
+  });
+
+  it("renders no rule markup when a finding carries no ruleId", async () => {
+    mockCreateReview.mockResolvedValue({ data: { id: 1 } });
+
+    await postPrReview(
+      "token",
+      "octocat/Hello-World",
+      42,
+      FINDINGS,
+      new Map([["src/app.ts", ADDED_HUNK]]),
+    );
+
+    const [params] = mockCreateReview.mock.calls[0];
+    expect(params.comments[0].body).not.toContain("undefined");
+    expect(params.body).not.toContain("undefined");
+  });
 });
