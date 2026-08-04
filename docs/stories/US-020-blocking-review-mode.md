@@ -1,7 +1,7 @@
 ---
 id: US-020
 title: "Blocking Review Mode"
-status: draft
+status: done
 epic: v3-llm-integration
 ---
 

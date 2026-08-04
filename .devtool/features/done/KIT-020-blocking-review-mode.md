@@ -1,13 +1,13 @@
 ---
 id: "KIT-020"
-status: "backlog"
+status: "done"
 priority: "high"
 assignee: ""
 epic: "v3-llm-integration"
 dueDate: null
 created: "2026-08-04"
 modified: "2026-08-04"
-completedAt: null
+completedAt: "2026-08-04"
 labels: ["config", "github", "debt"]
 order: "c10"
 ---
@@ -80,3 +80,11 @@ See [US-020](../../docs/stories/US-020-blocking-review-mode.md).
 - **Manual verification**: set `blocking: request_changes` in `XamuAvila/kitten-test-repo`'s `.reviewer.yml` and open a PR **authored by a different account than the reviewer token's user**, containing a deliberate bug. Run the review on minikube. On the GitHub PR page the review appears under "Changes requested" and the merge button shows the review as unresolved. Then flip `.reviewer.yml` back to `blocking: comment_only`, re-run, and confirm the new review is a plain comment leaving merge state untouched.
 - **Negative check**: three things must NOT happen — (1) with `blocking: request_changes` on a PR the **reviewer token's own user authored**, the job must still reach `completed` (`curl "$DISPATCHER_URL/status/<jobId>"`) with a comment-type review and a body line explaining the downgrade, never a `failed` status; (2) with `blocking: request_changes` on a PR that produces zero findings, no review may be submitted at all — only the "No issues found" comment; (3) sending `stop` mid-review must leave status `cancelled` with no `REQUEST_CHANGES` review on the PR.
 - **Done means**: `pnpm test && pnpm lint && pnpm build` all green, AND `blocking: request_changes` provably puts a real PR into "Changes requested", AND a self-authored PR downgrades to a comment with the job still reporting `completed`.
+
+## Completion notes (2026-08-04)
+
+- `pnpm test` → 30 files, 216 tests passing (209 → 216). `pnpm build` → exit 0. eslint on this card's four changed files → exit 0; repo-wide lint still exits 1 for the pre-existing reasons in [KIT-021](KIT-021-fix-pre-existing-lint-errors.md).
+- Decision 3 (delete `state`) required updating two tests that asserted the no-op field: `tests/github/review.test.ts` and `tests/pipeline.test.ts` both checked `params.state === "COMMENTED"`. They now assert `event` and the absence of `state`. Changing an assertion to match new behaviour is correct here only because the field's removal is backed by the openapi types cited under Consumes — the tests were pinning something that never took effect.
+- Decisions 5 and 6 held: the zero-findings and aborted-run guards passed the moment they were written, with no source change. Recorded as regression locks rather than dressed up as RED→GREEN cycles.
+- **Test-harness snag worth knowing:** on vitest 4.1.10, a persistently rejecting `createReview` mock (`mockRejectedValue`, or `mockImplementation` that throws) makes the non-422 test fail with the raw error even when the call is wrapped in `try`/`catch` — the rejection surfaces from outside the awaited call. `mockRejectedValueOnce` behaves correctly. Root cause not investigated; the working form is used with a comment at the call site.
+- Manual verification **not** run: AC-1 needs a real PR authored by a different account than the reviewer token's user, and AC-4 needs the opposite. Both require minikube plus a live GitHub PR. Still outstanding.

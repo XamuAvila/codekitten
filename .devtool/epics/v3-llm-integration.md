@@ -59,9 +59,15 @@ were specified in the config shape without a consuming card.
 
 | Card | Story | Scope |
 |---|---|---|
-| [KIT-018](../features/KIT-018-custom-review-rules.md) | [US-018](../../docs/stories/US-018-custom-review-rules.md) | `rules[]` reaches `prompt.user`; findings carry `ruleId`; undeclared ids stripped at consolidation; rule shown on the PR |
-| [KIT-019](../features/KIT-019-review-output-language.md) | [US-019](../../docs/stories/US-019-review-output-language.md) | `language` drives LLM-authored prose via a system-prompt block; machine fields and Kitten's own notices stay canonical English |
-| [KIT-020](../features/KIT-020-blocking-review-mode.md) | [US-020](../../docs/stories/US-020-blocking-review-mode.md) | `blocking: request_changes` submits `REQUEST_CHANGES`; 422 downgrades to `COMMENT`; clean and cancelled reviews never block |
+| [KIT-018](../features/done/KIT-018-custom-review-rules.md) | [US-018](../../docs/stories/US-018-custom-review-rules.md) | `rules[]` reaches `prompt.user`; findings carry `ruleId`; undeclared ids stripped at consolidation; rule shown on the PR |
+| [KIT-019](../features/done/KIT-019-review-output-language.md) | [US-019](../../docs/stories/US-019-review-output-language.md) | `language` drives LLM-authored prose via a system-prompt block; machine fields and Kitten's own notices stay canonical English |
+| [KIT-020](../features/done/KIT-020-blocking-review-mode.md) | [US-020](../../docs/stories/US-020-blocking-review-mode.md) | `blocking: request_changes` submits `REQUEST_CHANGES`; 422 downgrades to `COMMENT`; clean and cancelled reviews never block |
+
+All three are done as of 2026-08-04 (branch `feat/v3-orphan-config-fields`), so
+no `ReviewerConfig` field is inert any more. One card came out of the work:
+[KIT-021](../features/KIT-021-fix-pre-existing-lint-errors.md) — `pnpm lint`
+already exited 1 on `master` at `c374c4d`, 47 errors in three files none of
+these cards touch. Not a regression, and deliberately not fixed inline.
 
 ## Architecture
 
