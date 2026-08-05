@@ -43,6 +43,24 @@ spec:
                   optional: true
             - name: TRIGGER_WORD
               value: "@reviewer"
+            # Deep context (v7) — all optional: missing values disable the
+            # semble sidecar / knowledge store with a warning, never a failure.
+            - name: SEMBLE_IMAGE
+              value: "kitten-semble-sidecar:latest"
+            - name: SEMBLE_INDEX_PVC
+              value: "kitten-semble-index"
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: kitten-knowledge-secrets
+                  key: MONGODB_URI
+                  optional: true
+            - name: VOYAGE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kitten-knowledge-secrets
+                  key: VOYAGE_API_KEY
+                  optional: true
           resources:
             limits:
               memory: "256Mi"

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Redis } from "ioredis";
-import type { PubSubMessage, ReviewJob, ReviewJobStatus } from "@kitten/shared";
+import type { KnowledgeClient, PubSubMessage, ReviewJob, ReviewJobStatus } from "@kitten/shared";
 
 import type { K8sClient } from "../k8s/client.js";
 import { buildPodName } from "../k8s/manifest.js";
@@ -14,6 +14,8 @@ export interface EventRouterDeps {
   readonly redis: Redis;
   readonly podConfig: PodConfig;
   readonly triggerWord: string;
+  /** Atlas+Voyage knowledge store (KIT-037) — undefined when unconfigured. */
+  readonly knowledgeClient?: KnowledgeClient;
 }
 
 const HANDLED_PR_ACTIONS = new Set(["opened", "reopened", "synchronize"]);
@@ -96,6 +98,38 @@ async function handleIssueComment(payload: unknown, deps: EventRouterDeps): Prom
   }
   const text = body.slice(deps.triggerWord.length).trim();
   const command = text.toLowerCase();
+
+  // remember <text> — repo-scoped knowledge write, no live Pod needed
+  // (KIT-037 decision 4). Failure never bounces the delivery: GitHub would
+  // retry a 5xx into duplicate knowledge entries.
+  if (command === "remember" || command.startsWith("remember ")) {
+    const fact = text.slice("remember".length).trim();
+    if (fact === "") {
+      console.log("[dispatcher] Empty remember command ignored");
+      return { ignored: true };
+    }
+    if (deps.knowledgeClient === undefined) {
+      console.warn("[dispatcher] remember ignored — knowledge store not configured (MONGODB_URI/VOYAGE_API_KEY)");
+      return { ignored: true };
+    }
+    try {
+      await deps.knowledgeClient.insert({
+        repo: data.repository.full_name,
+        text: fact,
+        source: "command",
+        author: data.comment.user.login,
+        prNumber: data.issue.number,
+      });
+      console.log(`[dispatcher] Knowledge stored for ${data.repository.full_name} by ${data.comment.user.login}`);
+      return { status: "stored" };
+    } catch (error) {
+      console.warn(
+        `[dispatcher] Knowledge insert failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return { ignored: true };
+    }
+  }
+
   const message = command === "force" || command === "stop" ? command : text;
   if (message === "") return { ignored: true };
 

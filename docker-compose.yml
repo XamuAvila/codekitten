@@ -23,6 +23,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - PORT=3001
+      # Knowledge store (v7) — optional; empty disables with a warning
+      - MONGODB_URI=${MONGODB_URI:-}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
     depends_on:
       redis:
         condition: service_healthy

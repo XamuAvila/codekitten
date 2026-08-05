@@ -1,5 +1,6 @@
 import express from "express";
 import { Redis } from "ioredis";
+import { createKnowledgeClient } from "@kitten/shared";
 import { createHealthRouter } from "./routes/health.js";
 import { createReviewRouter } from "./routes/review.js";
 import { createStatusRouter } from "./routes/status.js";
@@ -23,6 +24,12 @@ export function createApp(config: AppConfig): express.Express {
   const app = express();
   const redis = new Redis(config.redisUrl, { lazyConnect: true });
   const k8sClient = new K8sClient();
+  // Knowledge store (KIT-037) — undefined without secrets; remember/correction
+  // capture degrade with a warning, reviews unaffected (epic error table).
+  const knowledgeClient = createKnowledgeClient(process.env);
+  if (knowledgeClient === undefined) {
+    console.warn("[dispatcher] Knowledge store disabled — MONGODB_URI/VOYAGE_API_KEY not set");
+  }
 
   // Body parsing — rawBody kept for webhook HMAC (signature covers exact bytes)
   app.use(
@@ -47,6 +54,7 @@ export function createApp(config: AppConfig): express.Express {
           redis,
           podConfig: config.podConfig,
           triggerWord: config.triggerWord ?? "@reviewer",
+          ...(knowledgeClient !== undefined ? { knowledgeClient } : {}),
         }),
     }),
   );

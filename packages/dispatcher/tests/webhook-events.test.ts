@@ -200,5 +200,75 @@ describe("routeEvent — pull_request", () => {
       expect(result).toEqual({ ignored: true });
       expect(publish).not.toHaveBeenCalled();
     });
+
+    describe("remember command (KIT-037)", () => {
+      let insert: ReturnType<typeof vi.fn>;
+
+      beforeEach(() => {
+        insert = vi.fn().mockResolvedValue(undefined);
+        deps = { ...deps, knowledgeClient: { insert } as never };
+      });
+
+      it("@reviewer remember <text> → knowledge insert with source command", async () => {
+        const result = await routeEvent(
+          "issue_comment",
+          commentPayload("@reviewer remember we always use zod for validation"),
+          deps,
+        );
+
+        expect(insert).toHaveBeenCalledWith({
+          repo: "octo/repo",
+          text: "we always use zod for validation",
+          source: "command",
+          author: "dev",
+          prNumber: 42,
+        });
+        expect(result.status).toBe("stored");
+        expect(publish).not.toHaveBeenCalled();
+      });
+
+      it("works without an active review job (repo-scoped, not job-scoped)", async () => {
+        const result = await routeEvent("issue_comment", commentPayload("@reviewer remember fact"), deps);
+        expect(insert).toHaveBeenCalledTimes(1);
+        expect(result.status).toBe("stored");
+      });
+
+      it("empty remember text → ignored + log, nothing stored", async () => {
+        const result = await routeEvent("issue_comment", commentPayload("@reviewer remember   "), deps);
+        expect(insert).not.toHaveBeenCalled();
+        expect(result).toEqual({ ignored: true });
+      });
+
+      it("no knowledge client configured → ignored with warning, no crash", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        deps = { ...deps, knowledgeClient: undefined };
+
+        const result = await routeEvent("issue_comment", commentPayload("@reviewer remember fact"), deps);
+
+        expect(result).toEqual({ ignored: true });
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("knowledge"));
+        warn.mockRestore();
+      });
+
+      it("insert failure → ignored with warning, delivery still acknowledged", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        insert.mockRejectedValue(new Error("atlas down"));
+
+        const result = await routeEvent("issue_comment", commentPayload("@reviewer remember fact"), deps);
+
+        expect(result).toEqual({ ignored: true });
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
+      });
+
+      it("bot author remember → ignored (existing bot filter)", async () => {
+        const payload = commentPayload("@reviewer remember fact", {
+          comment: { body: "@reviewer remember fact", user: { login: "kitten[bot]", type: "Bot" } },
+        });
+        const result = await routeEvent("issue_comment", payload, deps);
+        expect(insert).not.toHaveBeenCalled();
+        expect(result).toEqual({ ignored: true });
+      });
+    });
   });
 });

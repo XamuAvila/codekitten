@@ -1,6 +1,6 @@
 ---
 id: "KIT-037"
-status: "backlog"
+status: "in-progress"
 priority: "high"
 assignee: ""
 epic: "v7-deep-context"
@@ -23,6 +23,10 @@ See [US-033](../../docs/stories/US-033-repository-knowledge.md) (AC-1, AC-3, AC-
 endpoint) and Atlas Vector Search index definition via Context7 — never from
 memory.
 
+**Research findings (2026-08-05, Context7 + official Voyage/MongoDB docs):**
+- Voyage: model **`voyage-code-3`**, `POST https://api.voyageai.com/v1/embeddings`, `Authorization: Bearer $VOYAGE_API_KEY`, body `{model, input: [text], input_type: "document"|"query", output_dimension}`. Default dims **1024** (256/512/1024/2048 supported); context 32k tokens/input, truncation on by default. Response `{data: [{embedding: number[]}], usage}` (OpenAI-compatible).
+- Atlas: index type `vectorSearch`, definition `{fields: [{type: "vector", path: "embedding", numDimensions: 1024, similarity: "cosine"}, {type: "filter", path: "repo"}]}`; created via `collection.createSearchIndex(name, "vectorSearch", definition)` (node driver v6+, build async). Query: `$vectorSearch` first stage `{index, path, queryVector, numCandidates (≈20× limit), limit, filter: {repo}}`, score via `{$meta: "vectorSearchScore"}` (0..1). Vector search requires an Atlas cluster (historically M10+; unverified whether free tier supports it in 2026).
+
 **Created (shared):**
 - `packages/shared/src/knowledge/client.ts` — `KnowledgeClient`: `insert({repo, text, source, author, prNumber?})` (embeds via Voyage REST, writes to Atlas `knowledge` collection) and `search(repo, queryText, topK)` (vector search). Constructed from `MONGODB_URI` + `VOYAGE_API_KEY`; `createKnowledgeClient(env): KnowledgeClient | undefined` — undefined when unconfigured (callers skip with warning).
 - `packages/shared/src/knowledge/index.ts`; export from shared index.
@@ -43,14 +47,16 @@ memory.
 
 ## Implementation Plan
 
-1. - [ ] Research: Voyage + Atlas current docs (Context7); record model/dims/index JSON here.
-2. - [ ] RED: `packages/shared/tests/knowledge/client.test.ts` — mocked driver/fetch: insert embeds + writes shaped doc; search issues vector query; unconfigured → undefined client. FAIL.
-3. - [ ] GREEN: client. PASS.
-4. - [ ] RED: dispatcher `webhook-events.test.ts` — `@reviewer remember X` → insert called with source command/author; empty text ignored; no client → ignored + warning; bot ignored (existing filter). FAIL.
-5. - [ ] GREEN: command wiring. PASS.
+1. - [x] Research: Voyage + Atlas current docs (Context7); record model/dims/index JSON here.
+2. - [x] RED: `packages/shared/tests/knowledge/client.test.ts` — mocked driver/fetch: insert embeds + writes shaped doc; search issues vector query; unconfigured → undefined client. FAIL.
+3. - [x] GREEN: client. PASS.
+4. - [x] RED: dispatcher `webhook-events.test.ts` — `@reviewer remember X` → insert called with source command/author; empty text ignored; no client → ignored + warning; bot ignored (existing filter). FAIL.
+5. - [x] GREEN: command wiring. PASS.
 6. - [ ] Integration (skipped without secrets): real Voyage embed + Atlas roundtrip insert→search.
-7. - [ ] Commit: `feat: knowledge store (Atlas+Voyage) with @reviewer remember command`
-8. - [ ] `pnpm test && pnpm lint` green.
+7. - [x] Commit: `feat: knowledge store (Atlas+Voyage) with @reviewer remember command`
+8. - [x] `pnpm test && pnpm lint` green (unit level).
+
+**BLOCKED on step 6:** integration roundtrip needs real `MONGODB_URI` + `VOYAGE_API_KEY` in `.env` (absent as of 2026-08-05). Suite `packages/shared/tests/knowledge/integration.test.ts` is written and skips without secrets. Card stays in-progress until it runs green against real services.
 
 ## How to Test
 
