@@ -166,6 +166,37 @@ describe("runAgenticLoop", () => {
     expect(JSON.stringify(lastMessage.content)).toContain("read_file");
   });
 
+  it("git_log results feed back into the next turn's messages (US-031)", async () => {
+    const { execFileSync } = await import("node:child_process");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kitten-loop-git-"));
+    const env = {
+      ...process.env,
+      GIT_AUTHOR_NAME: "Loop Author",
+      GIT_AUTHOR_EMAIL: "loop@example.com",
+      GIT_COMMITTER_NAME: "Loop Author",
+      GIT_COMMITTER_EMAIL: "loop@example.com",
+    };
+    execFileSync("git", ["init", "-b", "main"], { cwd: dir, env });
+    fs.writeFileSync(path.join(dir, "a.ts"), "const a = 1;\n");
+    execFileSync("git", ["add", "."], { cwd: dir, env });
+    execFileSync("git", ["commit", "-m", "loop fixture commit"], { cwd: dir, env });
+
+    const adapter = makeAdapter([
+      { toolUses: [{ name: "git_log", input: { path: "a.ts" } }] },
+      { toolUses: [{ name: "report_findings", input: { findings: [] } }] },
+    ]);
+
+    const result = await runAgenticLoop(adapter, PROMPT, DEFAULT_MCP_CONFIG, {
+      registry: createRegistry(dir, [], DEFAULT_MCP_CONFIG),
+      maxOutputTokens: 8000,
+    });
+
+    expect(result.toolCalls).toBe(1);
+    const secondTurn = adapter.explore.mock.calls[1][0];
+    const lastMessage = secondTurn.messages[secondTurn.messages.length - 1];
+    expect(JSON.stringify(lastMessage.content)).toContain("loop fixture commit");
+  });
+
   it("an aborted signal stops the loop", async () => {
     const controller = new AbortController();
     controller.abort();

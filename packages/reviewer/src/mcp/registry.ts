@@ -37,6 +37,8 @@ import { readFileTool } from "./read-file.js";
 import { searchTool } from "./search.js";
 import { findRelatedTool } from "./find-related.js";
 import { listDirectoryTool } from "./list-directory.js";
+import { gitLogTool } from "./git-log.js";
+import { gitBlameTool } from "./git-blame.js";
 
 export function createRegistry(
   cloneDir: string,
@@ -45,7 +47,7 @@ export function createRegistry(
 ): McpRegistry {
   const ctx: McpContext = { cloneDir, skipPatterns, caps };
   const tools = new Map<McpToolName, McpTool>(
-    [readFileTool, searchTool, findRelatedTool, listDirectoryTool]
+    [readFileTool, searchTool, findRelatedTool, listDirectoryTool, gitLogTool, gitBlameTool]
       .filter((tool) => caps.tools.includes(tool.name))
       .map((tool) => [tool.name, tool]),
   );

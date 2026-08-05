@@ -11,14 +11,24 @@ import { AppError } from "../types/index.js";
  * Invalid content throws VALIDATION; the pipeline fail-safes to monolithic.
  */
 
-export const McpToolNameSchema = z.enum(["read_file", "search", "find_related", "list_directory"]);
+export const McpToolNameSchema = z.enum([
+  "read_file",
+  "search",
+  "find_related",
+  "list_directory",
+  "git_log",
+  "git_blame",
+]);
 export type McpToolName = z.infer<typeof McpToolNameSchema>;
 
 // strictObject at every level: unknown keys must fail with VALIDATION, not be
 // silently stripped — same rationale as RawReviewerSchema in parse-config.ts.
 const MCPConfigSchema = z.strictObject({
   enabled: z.boolean().default(false),
-  tools: z.array(McpToolNameSchema).readonly().default(["read_file", "search", "find_related", "list_directory"]),
+  tools: z
+    .array(McpToolNameSchema)
+    .readonly()
+    .default(["read_file", "search", "find_related", "list_directory", "git_log", "git_blame"]),
   maxTurns: z.number().int().positive().default(12),
   forceMaxTurns: z.number().int().positive().default(60),
   read: z
@@ -41,6 +51,12 @@ const MCPConfigSchema = z.strictObject({
   listDirectory: z
     .strictObject({ maxEntries: z.number().int().positive().default(100) })
     .default({ maxEntries: 100 }),
+  gitLog: z
+    .strictObject({ maxCommits: z.number().int().positive().default(20) })
+    .default({ maxCommits: 20 }),
+  gitBlame: z
+    .strictObject({ maxLines: z.number().int().positive().default(200) })
+    .default({ maxLines: 200 }),
 });
 
 export type MCPConfig = z.infer<typeof MCPConfigSchema>;

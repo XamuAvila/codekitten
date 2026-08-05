@@ -1,12 +1,13 @@
 ---
 id: "KIT-035"
-status: "backlog"
+status: "done"
 priority: "high"
 assignee: ""
 epic: "v7-deep-context"
 dueDate: null
 created: "2026-08-05"
 modified: "2026-08-05"
+completedAt: "2026-08-05"
 labels: ["deep-context", "tools"]
 order: "e1"
 ---
@@ -38,11 +39,11 @@ See [US-031](../../docs/stories/US-031-git-history-tools.md).
 
 ## Implementation Plan
 
-1. - [ ] RED: `tests/mcp/git-log.test.ts` + `git-blame.test.ts` on a fixture repo built in beforeAll (real git init + commits). Caps, confinement escapes, no-history path, blame range clamping. FAIL.
-2. - [ ] GREEN: both tools + registry + config schema. PASS.
-3. - [ ] RED/GREEN: loop integration test — results feed the next turn (v4 pattern).
-4. - [ ] Commit: `feat(reviewer): add git_log and git_blame agentic tools`
-5. - [ ] `pnpm test && pnpm lint` green.
+1. - [x] RED: `tests/mcp/git-log.test.ts` + `git-blame.test.ts` on a fixture repo built in beforeAll (real git init + commits). Caps, confinement escapes, no-history path, blame range clamping. FAIL.
+2. - [x] GREEN: both tools + registry + config schema. PASS.
+3. - [x] RED/GREEN: loop integration test — results feed the next turn (v4 pattern).
+4. - [x] Commit: `feat(reviewer): add git_log and git_blame agentic tools`
+5. - [x] `pnpm test && pnpm lint` green.
 
 ## How to Test
 
