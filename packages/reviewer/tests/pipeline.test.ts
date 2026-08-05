@@ -634,4 +634,66 @@ describe("runPipeline", () => {
     expect(bodies.some((b) => b.match(/exceeds the token budget/i))).toBe(true);
     expect(bodies.some((b) => b.match(/force/i))).toBe(true);
   });
+
+  describe("agentic branch (.reviewer-mcp.json, KIT-023)", () => {
+    const FINDING = { severity: "high", file: "src/app.ts", line: 1, finding: "Bug found" };
+
+    function enableAgenticFs(mcpJson: string) {
+      mockExistsSync.mockImplementation((path: unknown) => {
+        if (typeof path === "string" && path.endsWith(".reviewer-mcp.json")) return true;
+        if (typeof path === "string" && path.endsWith("src/app.ts")) return true;
+        return false;
+      });
+      mockReadFileSync.mockImplementation((path: string) => {
+        if (path.endsWith(".reviewer-mcp.json")) return mcpJson;
+        return "export const app = () => 1;";
+      });
+    }
+
+    it("enabled → runs the agentic loop and posts findings via postPrReview", async () => {
+      enableAgenticFs(JSON.stringify({ enabled: true }));
+      const mockExplore = vi.fn().mockResolvedValue({
+        toolUses: [{ name: "report_findings", input: { findings: [FINDING] } }],
+        metadata: { inputTokens: 10, outputTokens: 5, durationMs: 1 },
+      });
+      mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });
+
+      const result = await runPipeline(baseConfig);
+
+      expect(result.status).toBe("completed");
+      expect(mockExplore).toHaveBeenCalled();
+      expect(mockReview).not.toHaveBeenCalled();
+      expect(mockCreateReview).toHaveBeenCalled();
+      expect(result.mcpConfig?.enabled).toBe(true);
+      expect(result.metadata.toolCalls).toBe(0);
+      expect(result.findings).toHaveLength(1);
+    });
+
+    it("no file → v3 path, no agentic call", async () => {
+      const mockExplore = vi.fn();
+      mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });
+
+      const result = await runPipeline(baseConfig);
+
+      expect(result.status).toBe("completed");
+      expect(mockExplore).not.toHaveBeenCalled();
+      expect(mockReview).toHaveBeenCalled();
+      expect(result.mcpConfig).toBeUndefined();
+    });
+
+    it("invalid file → v3 path, completed, warning logged", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      enableAgenticFs("{ not json");
+      const mockExplore = vi.fn();
+      mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });
+
+      const result = await runPipeline(baseConfig);
+
+      expect(result.status).toBe("completed");
+      expect(mockExplore).not.toHaveBeenCalled();
+      expect(mockReview).toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(".reviewer-mcp.json"));
+      warn.mockRestore();
+    });
+  });
 });

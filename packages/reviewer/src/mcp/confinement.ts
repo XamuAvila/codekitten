@@ -55,7 +55,7 @@ export function isExcluded(relPath: string, skipPatterns: readonly string[]): bo
   if (relPath === ".git" || relPath.startsWith(".git/")) {
     return true;
   }
-  return skipPatterns.some((pattern) => picomatch.isMatch(relPath, pattern));
+  return skipPatterns.some((pattern) => picomatch(pattern, { dot: true })(relPath));
 }
 
 /**

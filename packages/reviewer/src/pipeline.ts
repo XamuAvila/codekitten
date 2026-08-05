@@ -1,5 +1,7 @@
-import { parseReviewerConfig, DEFAULT_CONFIG, AppError, createLlmAdapter } from "@kitten/shared";
-import type { ReviewContext, ReviewFile, ReviewJob, ReviewResult } from "@kitten/shared";
+import { parseReviewerConfig, parseMcpConfig, DEFAULT_CONFIG, AppError, createLlmAdapter } from "@kitten/shared";
+import type { MCPConfig, ReviewContext, ReviewFile, ReviewJob, ReviewResult } from "@kitten/shared";
+import { buildAgenticPrompt, runAgenticLoop } from "./agentic/index.js";
+import { createRegistry } from "./mcp/registry.js";
 import { cloneRepo } from "./git/clone.js";
 import { generateDiff } from "./git/diff.js";
 import { fetchPrFiles } from "./git/files.js";
@@ -65,6 +67,13 @@ export async function runPipeline(
       console.log("[reviewer] Config: .reviewer.yml not found, using defaults");
     }
 
+    // 4b. Read .reviewer-mcp.json — v4 agentic opt-in. Invalid/missing →
+    //     fail-safe to the v3 monolithic path (a bad file never fails a review).
+    const mcpConfig = readMcpConfigFromRepo(cloneDir);
+    if (mcpConfig?.enabled) {
+      console.log(`[reviewer] Agentic mode enabled (maxTurns=${mcpConfig.maxTurns}, tools=${mcpConfig.tools.join(",")})`);
+    }
+
     // 5. Read changed file contents (for the LLM prompt)
     const files = await readChangedFiles(cloneDir, prFiles);
 
@@ -99,12 +108,67 @@ export async function runPipeline(
     //     A failed chunk is skipped with a warning appended to the comment.
     const budget = reviewerConfig.config.maxContextTokens;
     const promptOverhead = estimateTokens(prompt.system) + estimateTokens(diff.raw);
+    // Agentic mode replaces the file-content chunking path (v4): the context
+    // starts small (diff + index), so per-chunk LLM rounds are unnecessary.
     const chunks =
-      !opts?.ignoreBudget && estimateTokens(prompt.user) > budget
-        ? splitFilesIntoChunks(files, budget, promptOverhead)
+      mcpConfig?.enabled || (!opts?.ignoreBudget && estimateTokens(prompt.user) > budget)
+        ? mcpConfig?.enabled
+          ? [{ files, estimatedTokens: 0 }]
+          : splitFilesIntoChunks(files, budget, promptOverhead)
         : [{ files, estimatedTokens: 0 }];
 
     const results: Array<{ result?: ReviewResult; error?: Error }> = [];
+    let agenticToolCalls: number | undefined;
+    let agenticHitBudget = false;
+
+    if (mcpConfig?.enabled) {
+      const registry = createRegistry(
+        cloneDir,
+        [...reviewerConfig.config.skip, ...mcpConfig.search.skip],
+        mcpConfig,
+      );
+      const maxTurns = opts?.ignoreBudget ? mcpConfig.forceMaxTurns : mcpConfig.maxTurns;
+      const agenticPrompt = buildAgenticPrompt(
+        diff.raw,
+        prFiles.map((file) => ({
+          path: file.filename,
+          status: file.status,
+          additions: file.additions,
+          deletions: file.deletions,
+          patchBytes: file.patch !== undefined ? Buffer.byteLength(file.patch, "utf-8") : 0,
+        })),
+        reviewerConfig.config,
+        conventions,
+        mcpConfig,
+        maxTurns,
+      );
+      try {
+        const loop = await runAgenticLoop(adapter, agenticPrompt, mcpConfig, {
+          registry,
+          maxOutputTokens: reviewerConfig.config.maxOutputTokens,
+          maxTurns,
+          ...(opts?.signal ? { signal: opts.signal } : {}),
+        });
+        agenticToolCalls = loop.toolCalls;
+        agenticHitBudget = loop.hitBudget;
+        console.log(`[reviewer] Agentic loop done: ${loop.toolCalls} tool calls, hitBudget=${loop.hitBudget}${loop.aborted ? ", aborted" : ""}`);
+        results.push({
+          result: {
+            findings: loop.findings,
+            contextChecked: [],
+            conventionsStatus: [],
+            metadata: {
+              model: reviewerConfig.config.model,
+              inputTokens: 0,
+              outputTokens: 0,
+              durationMs: 0,
+            },
+          },
+        });
+      } catch (error) {
+        results.push({ error: error instanceof Error ? error : new Error(String(error)) });
+      }
+    } else
     for (const [index, chunk] of chunks.entries()) {
       // Stop command aborts between chunks (KIT-016) — remaining chunks skipped
       if (opts?.signal?.aborted) {
@@ -225,7 +289,7 @@ export async function runPipeline(
     }
 
     // 8b. Budget question — over the budget, invite `force` (KIT-015 consumes)
-    if (wasChunked && !opts?.ignoreBudget) {
+    if ((wasChunked || agenticHitBudget) && !opts?.ignoreBudget) {
       await postReviewComment(config.token, config.repo, config.prNumber, {
         repo: config.repo,
         prNumber: config.prNumber,
@@ -247,7 +311,13 @@ export async function runPipeline(
       findings: result.findings,
       prompt,
       llmConfig: reviewerConfig.config,
-      metadata: { repo: config.repo, prNumber: config.prNumber, durationMs },
+      ...(mcpConfig?.enabled ? { mcpConfig } : {}),
+      metadata: {
+        repo: config.repo,
+        prNumber: config.prNumber,
+        durationMs,
+        ...(agenticToolCalls !== undefined ? { toolCalls: agenticToolCalls } : {}),
+      },
     };
   } catch (error) {
     const durationMs = Date.now() - start;
@@ -330,6 +400,27 @@ function readConfigFromRepo(repoDir: string): ConfigReadResult {
     return { found: true, config: parseReviewerConfig(content) };
   } catch {
     return { found: false, config: DEFAULT_CONFIG };
+  }
+}
+
+/**
+ * Reads .reviewer-mcp.json from the clone root (v4 opt-in). Missing →
+ * undefined (v3 path). Invalid content → warning + undefined: a bad config
+ * file must never fail a review (mirrors the .reviewer.yml fallback).
+ */
+function readMcpConfigFromRepo(repoDir: string): MCPConfig | undefined {
+  const configPath = `${repoDir}/.reviewer-mcp.json`;
+
+  if (!fs.existsSync(configPath)) {
+    return undefined;
+  }
+
+  try {
+    return parseMcpConfig(fs.readFileSync(configPath, "utf-8"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[reviewer] Invalid .reviewer-mcp.json — falling back to monolithic review: ${message}`);
+    return undefined;
   }
 }
 

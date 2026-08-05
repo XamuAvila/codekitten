@@ -18,13 +18,13 @@ export interface BuiltPrompt {
   readonly user: string;
 }
 
-export function buildReviewPrompt(
-  diff: string,
-  files: readonly ReviewFile[],
-  config: ReviewerConfig,
-  conventionsContent?: string,
-): BuiltPrompt {
-  const system = [
+/**
+ * The v3 guardrail system prompt, exported standalone so the v4 agentic
+ * prompt (agentic/build-agentic-prompt.ts) reuses the exact same guardrails
+ * and only appends its exploration block.
+ */
+export function buildGuardrailSystem(config: ReviewerConfig): string {
+  return [
     "You are an expert code reviewer. Your ONLY job is to review the provided pull request and report findings.",
     "",
     "SCOPE — NON-NEGOTIABLE:",
@@ -72,6 +72,15 @@ export function buildReviewPrompt(
     "- Respond ONLY with the structured output (tool call / JSON schema).",
     "- No preamble, no explanations outside the structured output.",
   ].join("\n");
+}
+
+export function buildReviewPrompt(
+  diff: string,
+  files: readonly ReviewFile[],
+  config: ReviewerConfig,
+  conventionsContent?: string,
+): BuiltPrompt {
+  const system = buildGuardrailSystem(config);
 
   const filesBlock = files
     .map((file) => `### ${file.path}\n\`\`\`\n${file.content}\n\`\`\``)

@@ -1,4 +1,4 @@
-import type { Finding, ReviewerConfig } from "@kitten/shared";
+import type { Finding, MCPConfig, ReviewerConfig } from "@kitten/shared";
 
 export interface CloneResult {
   readonly dir: string;
@@ -55,11 +55,15 @@ export interface PipelineResult {
   readonly prompt?: { readonly system: string; readonly user: string };
   /** Resolved reviewer config — KIT-017 reuses it for follow-up LLM calls. */
   readonly llmConfig?: ReviewerConfig;
+  /** Parsed .reviewer-mcp.json when the agentic path ran (v4, KIT-023). */
+  readonly mcpConfig?: MCPConfig;
   readonly error?: string;
   readonly metadata: {
     readonly repo: string;
     readonly prNumber: number;
     readonly durationMs: number;
+    /** Exploration tool calls executed by the agentic loop (v4). */
+    readonly toolCalls?: number;
   };
 }
 
