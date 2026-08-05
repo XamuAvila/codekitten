@@ -112,6 +112,67 @@ describe("buildPodManifest", () => {
   });
 });
 
+describe("buildPodManifest — semble sidecar (KIT-036)", () => {
+  const sidecarConfig: PodConfig = {
+    ...sampleConfig,
+    sembleImage: "ghcr.io/kitten/semble-sidecar:latest",
+    sembleIndexPvc: "kitten-semble-index",
+  };
+
+  it("no sembleImage → single container, no workspace volume, no sidecar env", () => {
+    const pod = buildPodManifest(sampleJob, sampleConfig);
+    expect(pod.spec?.containers).toHaveLength(1);
+    const envMap = new Map((pod.spec?.containers[0]?.env ?? []).map((e) => [e.name, e.value]));
+    expect(envMap.has("SEMBLE_SIDECAR_URL")).toBe(false);
+  });
+
+  it("sembleImage set → sidecar container sharing the workspace volume", () => {
+    const pod = buildPodManifest(sampleJob, sidecarConfig);
+    expect(pod.spec?.containers).toHaveLength(2);
+
+    const sidecar = pod.spec?.containers.find((c) => c.name === "semble");
+    expect(sidecar?.image).toBe("ghcr.io/kitten/semble-sidecar:latest");
+
+    for (const container of pod.spec?.containers ?? []) {
+      const mount = container.volumeMounts?.find((m) => m.name === "workspace");
+      expect(mount?.mountPath).toBe("/workspace");
+    }
+    expect(pod.spec?.volumes?.find((v) => v.name === "workspace")?.emptyDir).toBeDefined();
+  });
+
+  it("reviewer gets CLONE_DIR and SEMBLE_SIDECAR_URL; sidecar gets the index path keyed by repo+base", () => {
+    const pod = buildPodManifest(sampleJob, sidecarConfig);
+    const reviewerEnv = new Map(
+      (pod.spec?.containers.find((c) => c.name === "reviewer")?.env ?? []).map((e) => [e.name, e.value]),
+    );
+    expect(reviewerEnv.get("CLONE_DIR")).toBe("/workspace/repo");
+    expect(reviewerEnv.get("SEMBLE_SIDECAR_URL")).toBe("http://127.0.0.1:8765");
+
+    const sidecarEnv = new Map(
+      (pod.spec?.containers.find((c) => c.name === "semble")?.env ?? []).map((e) => [e.name, e.value]),
+    );
+    expect(sidecarEnv.get("SEMBLE_CACHE_LOCATION")).toBe("/semble-index/octocat-hello-world/main~1");
+    expect(sidecarEnv.get("REPO_PATH")).toBe("/workspace/repo");
+  });
+
+  it("PVC configured → semble-index volume backed by the PVC", () => {
+    const pod = buildPodManifest(sampleJob, sidecarConfig);
+    const volume = pod.spec?.volumes?.find((v) => v.name === "semble-index");
+    expect(volume?.persistentVolumeClaim?.claimName).toBe("kitten-semble-index");
+    const sidecar = pod.spec?.containers.find((c) => c.name === "semble");
+    expect(sidecar?.volumeMounts?.find((m) => m.name === "semble-index")?.mountPath).toBe("/semble-index");
+  });
+
+  it("no PVC → semble-index falls back to emptyDir (fresh index per run)", () => {
+    const config: PodConfig = { ...sidecarConfig };
+    delete (config as { sembleIndexPvc?: string }).sembleIndexPvc;
+    const pod = buildPodManifest(sampleJob, config);
+    const volume = pod.spec?.volumes?.find((v) => v.name === "semble-index");
+    expect(volume?.persistentVolumeClaim).toBeUndefined();
+    expect(volume?.emptyDir).toBeDefined();
+  });
+});
+
 describe("buildPodName", () => {
   it("produces lowercase deterministic name from repo and PR", () => {
     expect(buildPodName("octocat/Hello-World", 1)).toBe(

@@ -12,6 +12,8 @@ export interface McpContext {
   /** ReviewerConfig.skip + MCPConfig.search.skip — never read/searched. */
   readonly skipPatterns: readonly string[];
   readonly caps: MCPConfig;
+  /** Semble sidecar base URL (KIT-036) — absent outside the K8s Pod. */
+  readonly sembleUrl?: string;
 }
 
 export interface McpToolResult {
@@ -39,16 +41,25 @@ import { findRelatedTool } from "./find-related.js";
 import { listDirectoryTool } from "./list-directory.js";
 import { gitLogTool } from "./git-log.js";
 import { gitBlameTool } from "./git-blame.js";
+import { semanticSearchTool } from "./semantic-search.js";
 
 export function createRegistry(
   cloneDir: string,
   skipPatterns: readonly string[],
   caps: MCPConfig,
+  opts?: { readonly sembleUrl?: string },
 ): McpRegistry {
-  const ctx: McpContext = { cloneDir, skipPatterns, caps };
+  const ctx: McpContext = {
+    cloneDir,
+    skipPatterns,
+    caps,
+    ...(opts?.sembleUrl !== undefined ? { sembleUrl: opts.sembleUrl } : {}),
+  };
   const tools = new Map<McpToolName, McpTool>(
-    [readFileTool, searchTool, findRelatedTool, listDirectoryTool, gitLogTool, gitBlameTool]
+    [readFileTool, searchTool, findRelatedTool, listDirectoryTool, gitLogTool, gitBlameTool, semanticSearchTool]
       .filter((tool) => caps.tools.includes(tool.name))
+      // semantic_search only exists when the sidecar is present (KIT-036)
+      .filter((tool) => tool.name !== "semantic_search" || ctx.sembleUrl !== undefined)
       .map((tool) => [tool.name, tool]),
   );
   return {

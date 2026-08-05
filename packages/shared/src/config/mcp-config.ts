@@ -18,6 +18,7 @@ export const McpToolNameSchema = z.enum([
   "list_directory",
   "git_log",
   "git_blame",
+  "semantic_search",
 ]);
 export type McpToolName = z.infer<typeof McpToolNameSchema>;
 
@@ -28,7 +29,15 @@ const MCPConfigSchema = z.strictObject({
   tools: z
     .array(McpToolNameSchema)
     .readonly()
-    .default(["read_file", "search", "find_related", "list_directory", "git_log", "git_blame"]),
+    .default([
+      "read_file",
+      "search",
+      "find_related",
+      "list_directory",
+      "git_log",
+      "git_blame",
+      "semantic_search",
+    ]),
   maxTurns: z.number().int().positive().default(12),
   forceMaxTurns: z.number().int().positive().default(60),
   read: z
@@ -57,6 +66,9 @@ const MCPConfigSchema = z.strictObject({
   gitBlame: z
     .strictObject({ maxLines: z.number().int().positive().default(200) })
     .default({ maxLines: 200 }),
+  semanticSearch: z
+    .strictObject({ maxResults: z.number().int().positive().default(10) })
+    .default({ maxResults: 10 }),
 });
 
 export type MCPConfig = z.infer<typeof MCPConfigSchema>;

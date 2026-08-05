@@ -36,7 +36,10 @@ export async function runPipeline(
   opts?: PipelineOptions,
 ): Promise<PipelineResult> {
   const start = Date.now();
-  const cloneDir = `/tmp/clones/${config.jobId}`;
+  // Fixed CLONE_DIR in the K8s Pod (/workspace/repo, shared with the Semble
+  // sidecar — its index key hashes this absolute path, KIT-036). Outside K8s
+  // the per-job path keeps compose/local isolation.
+  const cloneDir = process.env.CLONE_DIR ?? `/tmp/clones/${config.jobId}`;
   let reviewerConfig: ConfigReadResult | undefined;
 
   try {
@@ -122,10 +125,12 @@ export async function runPipeline(
     let agenticHitBudget = false;
 
     if (mcpConfig?.enabled) {
+      const sembleUrl = process.env.SEMBLE_SIDECAR_URL;
       const registry = createRegistry(
         cloneDir,
         [...reviewerConfig.config.skip, ...mcpConfig.search.skip],
         mcpConfig,
+        sembleUrl !== undefined ? { sembleUrl } : {},
       );
       const maxTurns = opts?.ignoreBudget ? mcpConfig.forceMaxTurns : mcpConfig.maxTurns;
       const changedFileIndex = prFiles.map((file) => ({

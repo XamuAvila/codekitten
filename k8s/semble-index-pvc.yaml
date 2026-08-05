@@ -1,0 +1,15 @@
+# Persistent Semble index storage (KIT-036). Mounted at /semble-index in the
+# semble sidecar; index dirs are keyed /semble-index/{repo}/{baseRef} by the
+# Pod manifest so runs against the same base reuse the index (epic D2).
+# Derived data — safe to delete; semble rebuilds incrementally by file mtime.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kitten-semble-index
+  namespace: kitten
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
