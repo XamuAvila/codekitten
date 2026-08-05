@@ -41,3 +41,10 @@
 | US-033 | Teach the Reviewer Explicitly | done | v7-deep-context |
 | US-034 | Knowledge-Calibrated Reviews | done | v7-deep-context |
 | US-035 | Corrections Become Knowledge | done | v7-deep-context |
+| US-036 | Review Inputs Respect Repo Exclusions | draft | v8-agent-security-guardrails |
+| US-037 | Knowledge Store Rejects Secrets | draft | v8-agent-security-guardrails |
+| US-038 | Follow-Ups Never Leak Secrets | draft | v8-agent-security-guardrails |
+| US-039 | Agent Resists Exfiltration | draft | v8-agent-security-guardrails |
+| US-040 | Automated EKS Deploy (One-Time Setup + CI) | in-progress | v9-eks-deploy |
+| US-041 | Reviewer Pods Land on the Intended Nodes | done | v10-shared-cluster-deploy |
+| US-042 | Deploy on a Cluster You Do Not Own | done | v10-shared-cluster-deploy |

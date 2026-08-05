@@ -1,13 +1,13 @@
 ---
 id: "KIT-053"
-status: "in-progress"
+status: "done"
 priority: "high"
 assignee: ""
 epic: "v10-shared-cluster-deploy"
 dueDate: null
 created: "2026-08-05"
 modified: "2026-08-05"
-completedAt: null
+completedAt: "2026-08-05"
 labels: ["k8s", "deploy", "docs"]
 order: "a1"
 ---
@@ -16,7 +16,7 @@ order: "a1"
 
 ## User Story
 
-See [US-042](../../docs/stories/US-042-deploy-on-a-cluster-you-dont-own.md).
+See [US-042](../../../docs/stories/US-042-deploy-on-a-cluster-you-dont-own.md).
 
 ## Technical Refinement
 

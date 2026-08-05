@@ -14,7 +14,7 @@ live in `.devtool/epics/`, the stories they implement in `docs/stories/`.
 
 ### Added
 
-- **v10 — Shared-cluster deployment** *(in progress)*. Kitten becomes a well-behaved
+- **v10 — Shared-cluster deployment** *(done)*. Kitten becomes a well-behaved
   tenant of a cluster it does not own.
   - `REVIEWER_POD_SCHEDULING` — a JSON environment variable on the dispatcher
     steering where reviewer Pods are scheduled: `nodeSelector`, `tolerations` and

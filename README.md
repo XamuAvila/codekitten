@@ -362,6 +362,7 @@ Kitten is developed epic by epic; every epic ships a complete vertical slice.
 | v7 — Deep context | Git history tools, Semble semantic search, knowledge store, corrections | ✅ done |
 | v8 — Agent security guardrails | Exclusion enforcement, secret rejection in the knowledge store, exfiltration resistance | 🚧 in progress |
 | v9 — Automated EKS deploy | One-time EKS bootstrap + GitHub Actions CI/deploy on push to `master` | 🚧 in progress |
+| v10 — Shared-cluster deployment | Reviewer Pod scheduling config + a shared-cluster kustomize overlay | ✅ done |
 
 There is no v6: the originally planned "Production" epic was renumbered during v1
 planning and its scope has since been split across v8 and v9.
