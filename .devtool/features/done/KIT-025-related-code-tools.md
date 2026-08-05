@@ -27,8 +27,7 @@ See [US-025](../../docs/stories/US-025-related-code-tools.md).
 - `packages/reviewer/src/mcp/list-directory.ts` — `listDirectoryTool: McpTool` (one-level entries with dir/file flags)
 
 **Modified (reviewer):**
-- `packages/reviewer/src/mcp/registry.ts` — register both tools
-- `packages/reviewer/src/agentic/index.ts` — include both in the default enabled-tool set
+- `packages/reviewer/src/mcp/registry.ts` — register both tools. No other file needed: the default enabled-tool set lives in `MCPConfig.tools` (`packages/shared/src/config/mcp-config.ts`) and the registry filters by it — the planned `agentic/index.ts` edit was unnecessary (docs-alignment, 2026-08-05).
 
 ### Consumes
 

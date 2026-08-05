@@ -26,8 +26,7 @@ See [US-024](../../docs/stories/US-024-repo-search-tool.md).
 - `packages/reviewer/src/mcp/search.ts` — `searchTool: McpTool` (regex search over the clone, honoring skip patterns and `.git` exclusion; capped results with context lines; `truncated` flag)
 
 **Modified (reviewer):**
-- `packages/reviewer/src/mcp/registry.ts` — register `searchTool` alongside `readFileTool` (KIT-023)
-- `packages/reviewer/src/agentic/index.ts` — include `search` in the default enabled-tool set
+- `packages/reviewer/src/mcp/registry.ts` — register `searchTool` alongside `readFileTool` (KIT-023). No other file needed: the default enabled-tool set lives in `MCPConfig.tools` (`packages/shared/src/config/mcp-config.ts`) and the registry filters by it — the planned `agentic/index.ts` edit was unnecessary (docs-alignment, 2026-08-05).
 
 ### Consumes
 

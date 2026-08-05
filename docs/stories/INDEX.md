@@ -32,4 +32,4 @@
 | US-024 | Repository-Wide Search During Agentic Review | done | v4-mcp-agentic-review |
 | US-025 | Related-Code Discovery During Agentic Review | done | v4-mcp-agentic-review |
 | US-026 | Agentic Cost Control | done | v4-mcp-agentic-review |
-| US-027 | Agentic Review Hardening | in-progress | v4-mcp-agentic-review |
+| US-027 | Agentic Review Hardening | done | v4-mcp-agentic-review |

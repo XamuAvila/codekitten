@@ -1,7 +1,7 @@
 ---
 id: v4-mcp-agentic-review
 title: "v4: MCP Agentic Review"
-status: active
+status: done
 created: "2026-08-05"
 ---
 
@@ -329,7 +329,7 @@ Structured errors everywhere: `{ code, message, details }`.
 | Unit | `MCPConfig` parse (valid/invalid/absent/unknown-key), confinement (escape, `.git`, skip, caps, truncation), each tool executor, loop orchestration (turn accounting, finalize, stop abort, report_findings end) | vitest, mocked SDK |
 | Integration | Real DeepSeek agentic loop on a fixture repo — small controlled budget; verify multi-turn tool-result loops work on the DeepSeek Anthropic endpoint (risk gate). **If this fails:** the vendor-agnostic adapter design (v3 KIT-012) allows switching to OpenAI (Chat Completions `tools` + `tool_choice`), which supports multi-turn tool calls natively. This is a **dev-time provider choice**, not runtime failover — v3 explicitly rejected runtime provider fallback (v3 epic out-of-scope). The DeepSeek discount is lost, but the adapter interface does not change. | vitest with real `DEEPSEEK_API_KEY` |
 | Component | Pipeline branch (enabled vs disabled), `force`/`stop` on an agentic job | Redis in container |
-| E2E | minikube: `.reviewer-mcp.json` enabled → agentic findings posted; disabled → byte-identical to v3 | `scripts/e2e-test.sh` (extended) |
+| E2E | minikube: `.reviewer-mcp.json` enabled → agentic findings posted; disabled → byte-identical to v3 | Verified manually on minikube (2026-08-05): v3 flow via `scripts/e2e-test.sh`; agentic flow by committing `.reviewer-mcp.json` to the fixture repo's default branch and submitting a review (7 tool calls, 1 finding posted inline). The script itself was NOT extended — automating the agentic scenario is future work, not an epic promise. |
 
 Coverage target: 80%+ on shared + reviewer.
 
@@ -342,6 +342,7 @@ Coverage target: 80%+ on shared + reviewer.
 | D3 | Tool surface | **`read_file`, `search`, `find_related`, `list_directory`** — all four. Read-only enforced by construction (no write tools + root confinement + caps), not by prompt alone. |
 | D4 | Budget model | **Turn cap + per-result caps.** `maxTurns` (default 12) + per-tool size caps; agentic mode replaces file-content chunking; `force` raises the cap to `forceMaxTurns` (60). |
 | D5 | Config shape | **Separate `.reviewer-mcp.json`**, strict zod, additive to `.reviewer.yml`, fail-safe to monolithic when invalid/missing. |
+| D7 | Config ref (post-hoc, 2026-08-05) | **Configs are read from the repo's DEFAULT branch**, not the PR head: `cloneRepo` (`packages/reviewer/src/git/clone.ts`) clones without checking out `headRef`, so `.reviewer.yml` AND `.reviewer-mcp.json` only take effect once merged. Inherited v3 behavior, kept deliberately — a PR cannot grant itself agentic tools (or any config change) before review. Discovered during the v4 e2e; recorded so nobody reads "read from the repo root" as "from the PR branch". |
 | D6 | Findings contract | **Unchanged.** Loop ends with the same `report_findings` tool; `Finding[]`/consolidation/PR posting reused verbatim. `evidence` traceability deferred to a future phase. |
 
 ## What is NOT in v4 (out-of-scope)
