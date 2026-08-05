@@ -1,11 +1,11 @@
 import { Router } from "express";
 import type { Redis } from "ioredis";
-import { ReviewJobSchema, AppError } from "@kitten/shared";
-import type { ReviewJob, ReviewJobStatus } from "@kitten/shared";
+import { ReviewJobSchema } from "@kitten/shared";
+import type { ReviewJob } from "@kitten/shared";
 import { validate } from "../middleware/validation.js";
 import type { K8sClient } from "../k8s/client.js";
-import { buildPodManifest, buildPodName } from "../k8s/manifest.js";
 import type { PodConfig } from "../k8s/manifest.js";
+import { dispatchReview } from "../webhook/dispatch.js";
 
 export interface ReviewRouterDeps {
   readonly k8sClient: K8sClient;
@@ -23,33 +23,9 @@ export function createReviewRouter(deps: ReviewRouterDeps): Router {
   router.post("/review", validate(ReviewJobSchema), async (req, res, next) => {
     try {
       const job: ReviewJob = req.body;
-      const podName = buildPodName(job.repo, job.prNumber);
-      const manifest = buildPodManifest(job, deps.podConfig);
-
-      try {
-        await deps.k8sClient.createPod(manifest);
-      } catch (err) {
-        throw new AppError(
-          "SERVICE_UNAVAILABLE",
-          "Cannot create review pod",
-          [{ originalError: err instanceof Error ? err.message : String(err) }],
-        );
-      }
-
-      const initialStatus: ReviewJobStatus = {
-        jobId: podName,
-        status: "queued",
-        podName,
-        createdAt: new Date().toISOString(),
-        followUpCount: 0,
-      };
-
-      await deps.redis.set(
-        `review:${podName}:status`,
-        JSON.stringify(initialStatus),
-      );
-
-      res.status(202).json({ jobId: podName, status: "queued" });
+      // Pod creation + status write shared with the webhook (KIT-032)
+      const result = await dispatchReview(job, deps);
+      res.status(202).json(result);
     } catch (err) {
       next(err);
     }

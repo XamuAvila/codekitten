@@ -31,7 +31,7 @@ export type FollowUpMessage = z.infer<typeof FollowUpMessageSchema>;
  * The reviewer Pod subscribes to this channel for follow-up instructions.
  */
 export const PubSubMessageSchema = z.object({
-  type: z.enum(["follow_up", "shutdown"]),
+  type: z.enum(["follow_up", "shutdown", "re_review"]),
   payload: z.union([FollowUpMessageSchema, z.record(z.string(), z.never())]),
   timestamp: z.string().min(1),
 });

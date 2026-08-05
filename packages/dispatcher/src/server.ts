@@ -5,6 +5,7 @@ import { createReviewRouter } from "./routes/review.js";
 import { createStatusRouter } from "./routes/status.js";
 import { createMessageRouter } from "./routes/message.js";
 import { createWebhookRouter } from "./routes/webhook.js";
+import { routeEvent } from "./webhook/events.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { K8sClient } from "./k8s/client.js";
 import type { PodConfig } from "./k8s/manifest.js";
@@ -40,8 +41,13 @@ export function createApp(config: AppConfig): express.Express {
   app.use(
     createWebhookRouter({
       webhookSecret: config.webhookSecret,
-      // Event router lands in KIT-032/033 — until then every event is ignored.
-      routeEvent: async () => ({ ignored: true }),
+      routeEvent: (event, payload) =>
+        routeEvent(event, payload, {
+          k8sClient,
+          redis,
+          podConfig: config.podConfig,
+          triggerWord: config.triggerWord ?? "@reviewer",
+        }),
     }),
   );
 
