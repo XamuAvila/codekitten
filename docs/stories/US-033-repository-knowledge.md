@@ -1,8 +1,8 @@
-# US-033 — Repository Knowledge
+# US-033 — Teach the Reviewer Explicitly
 
-**As a** team using the reviewer,
-**I want** to teach it durable repo facts — explicitly (`@reviewer remember …`) and by correcting wrong findings in PR threads
-**so that** the same mistake or question does not repeat on every review.
+**As a** tech lead using the reviewer on my repository,
+**I want** to record a durable repo fact by commenting `@reviewer remember <text>` on any PR
+**so that** conventions and intentional decisions stop being re-litigated on every review.
 
 ## Acceptance Criteria
 
@@ -11,17 +11,18 @@
 **When** the webhook delivers it
 **Then** the text is stored in the repo's Atlas knowledge collection with a Voyage embedding, `source: "command"`, and the author.
 
-### AC-2 — Corrections on findings become knowledge
-**Given** a human reply on a reviewer finding thread explaining why it is wrong
-**When** the `pull_request_review_comment` webhook delivers it
-**Then** the reply (plus the finding it corrects) is stored with `source: "correction"`.
-
-### AC-3 — Bots and empty content are ignored
-**Given** a bot reply or an empty `remember`
+### AC-2 — Empty remember is ignored
+**Given** a comment `@reviewer remember` with no text
 **When** the event arrives
-**Then** nothing is stored and the delivery is acknowledged.
+**Then** nothing is stored and the delivery is acknowledged with a log.
 
-### AC-4 — Knowledge is off without configuration
+### AC-3 — Knowledge is off without configuration
 **Given** `MONGODB_URI` or `VOYAGE_API_KEY` unset
-**When** any knowledge write is attempted
-**Then** it is skipped with a warning; nothing errors toward GitHub.
+**When** a remember arrives
+**Then** the write is skipped with a warning; nothing errors toward GitHub.
+
+## Test reminders
+
+- remember with rich text (pass — doc in Atlas with embedding)
+- remember from a bot account (ignored — v5 bot filter)
+- remember on a plain issue, not a PR (ignored)

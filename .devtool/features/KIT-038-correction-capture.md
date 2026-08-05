@@ -15,7 +15,7 @@ order: "e4"
 
 ## User Story
 
-See [US-033](../../docs/stories/US-033-repository-knowledge.md) (AC-2, AC-3).
+See [US-035](../../docs/stories/US-035-corrections-become-knowledge.md).
 
 ## Technical Refinement
 

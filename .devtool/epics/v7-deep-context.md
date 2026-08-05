@@ -72,7 +72,7 @@ Execution order (sequential):
 | [KIT-035](../features/KIT-035-git-history-tools.md) | [US-031](../../docs/stories/US-031-git-history-tools.md) | `git_log` + `git_blame` McpTools |
 | [KIT-036](../features/KIT-036-semble-sidecar.md) | [US-032](../../docs/stories/US-032-semantic-code-search.md) | Semble sidecar container, PVC index, `semantic_search` tool, lexical fallback |
 | [KIT-037](../features/KIT-037-knowledge-store-remember.md) | [US-033](../../docs/stories/US-033-repository-knowledge.md) | shared Atlas+Voyage client, `remember` comment command |
-| [KIT-038](../features/KIT-038-correction-capture.md) | [US-033](../../docs/stories/US-033-repository-knowledge.md) | `pull_request_review_comment` webhook → corrections stored |
+| [KIT-038](../features/KIT-038-correction-capture.md) | [US-035](../../docs/stories/US-035-corrections-become-knowledge.md) | `pull_request_review_comment` webhook → corrections stored |
 | [KIT-039](../features/KIT-039-knowledge-few-shot.md) | [US-034](../../docs/stories/US-034-knowledge-calibrated-reviews.md) | vector retrieval + "Repository knowledge" prompt block in both paths |
 | [KIT-040](../features/KIT-040-deep-context-e2e.md) | [US-034](../../docs/stories/US-034-knowledge-calibrated-reviews.md) | e2e (minikube + Atlas), docs, invariant amendment, epic close gate |
 

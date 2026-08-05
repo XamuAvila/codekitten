@@ -1,6 +1,6 @@
 # US-034 — Knowledge-Calibrated Reviews
 
-**As a** team using the reviewer,
+**As a** tech lead using the reviewer on my repository,
 **I want** every review to start from the repo's accumulated knowledge
 **so that** findings respect known conventions and previously corrected mistakes.
 
