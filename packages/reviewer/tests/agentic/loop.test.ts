@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { AppError, DEFAULT_MCP_CONFIG } from "@kitten/shared";
+import { DEFAULT_MCP_CONFIG } from "@kitten/shared";
 import type { ExploreResult, LLMAdapter } from "@kitten/shared";
 
 import { runAgenticLoop } from "../../src/agentic/loop.js";
