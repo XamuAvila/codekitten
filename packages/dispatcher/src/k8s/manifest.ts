@@ -117,6 +117,28 @@ export function buildPodManifest(request: ReviewJob, config: PodConfig): V1Pod {
                 },
               },
             },
+            // Knowledge store (KIT-039) — same secrets as the dispatcher,
+            // optional: missing keys disable knowledge with a warning.
+            {
+              name: "MONGODB_URI",
+              valueFrom: {
+                secretKeyRef: {
+                  name: "kitten-knowledge-secrets",
+                  key: "MONGODB_URI",
+                  optional: true,
+                },
+              },
+            },
+            {
+              name: "VOYAGE_API_KEY",
+              valueFrom: {
+                secretKeyRef: {
+                  name: "kitten-knowledge-secrets",
+                  key: "VOYAGE_API_KEY",
+                  optional: true,
+                },
+              },
+            },
           ],
           resources: {
             requests: {

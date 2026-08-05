@@ -7,9 +7,10 @@ const callOrder: string[] = [];
 // Mocking at the adapter level, not the SDK: the pipeline imports from
 // @kitten/shared (dist build), and vi.mock on the transitive SDK import does
 // not intercept the dist's resolution.
-const { mockCreateLlmAdapter, mockReview } = vi.hoisted(() => ({
+const { mockCreateLlmAdapter, mockReview, mockCreateKnowledgeClient } = vi.hoisted(() => ({
   mockCreateLlmAdapter: vi.fn(),
   mockReview: vi.fn(),
+  mockCreateKnowledgeClient: vi.fn(),
 }));
 
 vi.mock("@kitten/shared", async (importOriginal) => {
@@ -17,6 +18,7 @@ vi.mock("@kitten/shared", async (importOriginal) => {
   return {
     ...mod,
     createLlmAdapter: mockCreateLlmAdapter,
+    createKnowledgeClient: mockCreateKnowledgeClient,
   };
 });
 
@@ -135,6 +137,7 @@ describe("runPipeline", () => {
     mockReaddirSync.mockReturnValue([]);
     mockStatSync.mockReturnValue({ size: 0 });
     mockReview.mockResolvedValue(llmReviewResult([]));
+    mockCreateKnowledgeClient.mockReturnValue(undefined);
     mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn() });
 
     // Reset git mocks to default behavior
@@ -279,6 +282,7 @@ describe("runPipeline", () => {
     );
     mockReadFileSync.mockReturnValue("reviewer:\n  blocking: request_changes\n");
     mockReview.mockResolvedValue(llmReviewResult([]));
+    mockCreateKnowledgeClient.mockReturnValue(undefined);
 
     await runPipeline(baseConfig);
 
@@ -302,6 +306,7 @@ describe("runPipeline", () => {
 
   it("posts an issue comment (no PR review) when there are zero findings", async () => {
     mockReview.mockResolvedValue(llmReviewResult([]));
+    mockCreateKnowledgeClient.mockReturnValue(undefined);
 
     await runPipeline(baseConfig);
 
@@ -434,6 +439,7 @@ describe("runPipeline", () => {
     });
 
     mockReview.mockResolvedValue(llmReviewResult([]));
+    mockCreateKnowledgeClient.mockReturnValue(undefined);
 
     await runPipeline(baseConfig);
 
@@ -489,6 +495,7 @@ describe("runPipeline", () => {
       ],
     });
     mockReview.mockResolvedValue(llmReviewResult([]));
+    mockCreateKnowledgeClient.mockReturnValue(undefined);
 
     const result = await runPipeline(baseConfig, { ignoreBudget: true });
 
@@ -575,6 +582,7 @@ describe("runPipeline", () => {
     );
     mockReadFileSync.mockReturnValue("reviewer:\n  language: pt\n");
     mockReview.mockResolvedValue(llmReviewResult([]));
+    mockCreateKnowledgeClient.mockReturnValue(undefined);
 
     await runPipeline(baseConfig);
 
@@ -600,6 +608,7 @@ describe("runPipeline", () => {
       ],
     });
     mockReview.mockResolvedValue(llmReviewResult([]));
+    mockCreateKnowledgeClient.mockReturnValue(undefined);
 
     await runPipeline(baseConfig);
 
@@ -626,6 +635,7 @@ describe("runPipeline", () => {
     });
 
     mockReview.mockResolvedValue(llmReviewResult([]));
+    mockCreateKnowledgeClient.mockReturnValue(undefined);
 
     await runPipeline(baseConfig);
 
@@ -781,4 +791,51 @@ describe("runPipeline", () => {
       warn.mockRestore();
     });
   });
+
+  describe("repository knowledge (KIT-039)", () => {
+    const ENTRY = { text: "we always use zod", source: "command", author: "alice", score: 0.9 };
+
+    it("knowledge entries reach the monolithic prompt", async () => {
+      mockCreateKnowledgeClient.mockReturnValue({
+        search: vi.fn().mockResolvedValue([ENTRY]),
+        insert: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+      });
+
+      await runPipeline(baseConfig);
+
+      const [context] = mockReview.mock.calls[0];
+      expect(context.prompt.user).toContain("Repository knowledge:");
+      expect(context.prompt.user).toContain("we always use zod");
+      expect(context.prompt.system).toContain("REPOSITORY KNOWLEDGE:");
+    });
+
+    it("unset secrets → no knowledge block, review runs normally", async () => {
+      mockCreateKnowledgeClient.mockReturnValue(undefined);
+
+      const result = await runPipeline(baseConfig);
+
+      expect(result.status).toBe("completed");
+      const [context] = mockReview.mock.calls[0];
+      expect(context.prompt.user).not.toContain("Repository knowledge:");
+    });
+
+    it("knowledge search failure → warning, review completes without a block", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockCreateKnowledgeClient.mockReturnValue({
+        search: vi.fn().mockRejectedValue(new Error("atlas down")),
+        insert: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+      });
+
+      const result = await runPipeline(baseConfig);
+
+      expect(result.status).toBe("completed");
+      const [context] = mockReview.mock.calls[0];
+      expect(context.prompt.user).not.toContain("Repository knowledge:");
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("knowledge"));
+      warn.mockRestore();
+    });
+  });
 });
+

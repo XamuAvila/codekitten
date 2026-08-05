@@ -1,4 +1,11 @@
-import { parseReviewerConfig, parseMcpConfig, DEFAULT_CONFIG, AppError, createLlmAdapter } from "@kitten/shared";
+import {
+  parseReviewerConfig,
+  parseMcpConfig,
+  DEFAULT_CONFIG,
+  AppError,
+  createLlmAdapter,
+  createKnowledgeClient,
+} from "@kitten/shared";
 import type { MCPConfig, ReviewContext, ReviewFile, ReviewJob, ReviewResult } from "@kitten/shared";
 import { buildAgenticPrompt, runAgenticLoop } from "./agentic/index.js";
 import { createRegistry } from "./mcp/registry.js";
@@ -7,6 +14,7 @@ import { generateDiff } from "./git/diff.js";
 import { fetchPrFiles } from "./git/files.js";
 import { readChangedFiles } from "./git/read-files.js";
 import { buildReviewPrompt } from "./prompt/build-prompt.js";
+import { buildKnowledgeBlock, fetchKnowledge } from "./prompt/knowledge-block.js";
 import { callWithRetry, isAuthError } from "./pipeline/retry.js";
 import { splitFilesIntoChunks, consolidateFindings, estimateTokens } from "./chunker/index.js";
 import { postReviewComment } from "./github/comment.js";
@@ -80,9 +88,28 @@ export async function runPipeline(
     // 5. Read changed file contents (for the LLM prompt)
     const files = await readChangedFiles(cloneDir, prFiles);
 
+    // 5b. Repository knowledge (KIT-039) — top-K entries by similarity to the
+    //     diff, injected into BOTH prompt paths. Unconfigured/failed → empty
+    //     block, review proceeds (epic error table).
+    const knowledgeClient = createKnowledgeClient(process.env);
+    if (knowledgeClient === undefined) {
+      console.warn("[reviewer] Knowledge disabled — MONGODB_URI/VOYAGE_API_KEY not set");
+    }
+    const knowledgeEntries = await fetchKnowledge(
+      knowledgeClient,
+      config.repo,
+      diff.raw,
+      reviewerConfig.config.knowledgeTopK,
+    );
+    const knowledgeBlock = buildKnowledgeBlock(knowledgeEntries);
+    if (knowledgeEntries.length > 0) {
+      console.log(`[reviewer] Repository knowledge: ${knowledgeEntries.length} entries injected`);
+    }
+    await knowledgeClient?.close().catch(() => {});
+
     // 6. Build the monolithic guardrailed prompt
     const conventions = readConventions(cloneDir, reviewerConfig.config.conventionsFile);
-    const prompt = buildReviewPrompt(diff.raw, files, reviewerConfig.config, conventions);
+    const prompt = buildReviewPrompt(diff.raw, files, reviewerConfig.config, conventions, knowledgeBlock);
 
     // 7. Call the LLM (retry transient failures; never retry auth)
     // Factory selects the SDK by provider and the key by base_url (KIT-012).
@@ -142,7 +169,7 @@ export async function runPipeline(
       }));
       const resolvedConfig = reviewerConfig.config;
       const buildPrompt = (diffRaw: string) =>
-        buildAgenticPrompt(diffRaw, changedFileIndex, resolvedConfig, conventions, mcpConfig, maxTurns);
+        buildAgenticPrompt(diffRaw, changedFileIndex, resolvedConfig, conventions, mcpConfig, maxTurns, knowledgeBlock);
 
       // maxContextTokens guards the initial prompt (US-027 AC-1). Oversized
       // diff → truncate to fit; the model recovers missing context via the

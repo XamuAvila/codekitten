@@ -34,6 +34,8 @@ export const ReviewerConfigSchema = z.object({
   skip: z.array(z.string()).readonly(),
   conventionsFile: z.string().min(1),
   rules: z.array(ReviewRuleSchema).readonly(),
+  /** Top-K knowledge entries retrieved as few-shot context (KIT-039). */
+  knowledgeTopK: z.number().int().positive(),
 });
 
 export type ReviewerConfig = z.infer<typeof ReviewerConfigSchema>;

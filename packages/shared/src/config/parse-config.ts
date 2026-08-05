@@ -26,6 +26,7 @@ const RawReviewerSchema = z.strictObject({
   skip: z.array(z.string()).optional(),
   conventions_file: z.string().min(1).optional(),
   rules: z.array(ReviewRuleSchema).optional(),
+  knowledge_top_k: z.number().int().positive().optional(),
 });
 
 const RawFileSchema = z
@@ -68,6 +69,7 @@ function toReviewerConfig(raw: RawReviewer): ReviewerConfig {
     skip: raw.skip ?? DEFAULT_CONFIG.skip,
     conventionsFile: raw.conventions_file ?? DEFAULT_CONFIG.conventionsFile,
     rules: raw.rules ?? DEFAULT_CONFIG.rules,
+    knowledgeTopK: raw.knowledge_top_k ?? DEFAULT_CONFIG.knowledgeTopK,
   });
 }
 

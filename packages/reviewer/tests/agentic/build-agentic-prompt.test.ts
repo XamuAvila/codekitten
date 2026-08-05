@@ -40,4 +40,15 @@ describe("buildAgenticPrompt", () => {
     const { system } = buildAgenticPrompt(DIFF, CHANGED_FILES, DEFAULT_CONFIG, undefined, DEFAULT_MCP_CONFIG, 60);
     expect(system).toContain("60");
   });
+
+  it("renders the knowledge block above the diff when provided (KIT-039)", () => {
+    const { user, system } = buildAgenticPrompt(
+      DIFF, CHANGED_FILES, DEFAULT_CONFIG, undefined, DEFAULT_MCP_CONFIG, undefined,
+      "Repository knowledge:\n1. fact",
+    );
+    expect(user).toContain("Repository knowledge:");
+    expect(user.indexOf("Repository knowledge:")).toBeLessThan(user.indexOf("Pull request diff:"));
+    expect(system).toContain("REPOSITORY KNOWLEDGE:");
+  });
 });
+

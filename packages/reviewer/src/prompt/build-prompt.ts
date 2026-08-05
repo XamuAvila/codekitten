@@ -23,7 +23,7 @@ export interface BuiltPrompt {
  * prompt (agentic/build-agentic-prompt.ts) reuses the exact same guardrails
  * and only appends its exploration block.
  */
-export function buildGuardrailSystem(config: ReviewerConfig): string {
+export function buildGuardrailSystem(config: ReviewerConfig, hasKnowledge = false): string {
   return [
     "You are an expert code reviewer. Your ONLY job is to review the provided pull request and report findings.",
     "",
@@ -60,6 +60,17 @@ export function buildGuardrailSystem(config: ReviewerConfig): string {
     // which are not findings. Naming the machine-readable fields is not
     // decoration — a model told to write Portuguese will happily return
     // severity "alto", which fails FindingSchema and costs a retry.
+    // Knowledge calibrates but never relaxes precision (KIT-039): stored
+    // team facts drop known-intentional findings, they don't invite new ones.
+    ...(hasKnowledge
+      ? [
+          "REPOSITORY KNOWLEDGE:",
+          "- The user content carries a \"Repository knowledge\" block: facts the team taught the reviewer and human corrections on past findings.",
+          "- Use it to CALIBRATE: do not report findings the knowledge marks as intentional, and respect stated team conventions.",
+          "- Knowledge entries never relax the precision guardrails above — they only remove noise, never lower the bar.",
+          "",
+        ]
+      : []),
     "LANGUAGE:",
     `- Write every piece of prose you author — finding descriptions, suggestions, and any free-text answer — in "${config.language}".`,
     // `ruleId` is deliberately absent from this list: it only exists when the
@@ -79,8 +90,10 @@ export function buildReviewPrompt(
   files: readonly ReviewFile[],
   config: ReviewerConfig,
   conventionsContent?: string,
+  knowledgeBlock?: string,
 ): BuiltPrompt {
-  const system = buildGuardrailSystem(config);
+  const hasKnowledge = knowledgeBlock !== undefined && knowledgeBlock !== "";
+  const system = buildGuardrailSystem(config, hasKnowledge);
 
   const filesBlock = files
     .map((file) => `### ${file.path}\n\`\`\`\n${file.content}\n\`\`\``)
@@ -101,6 +114,7 @@ export function buildReviewPrompt(
   const user = [
     conventionsContent ? `Repository conventions:\n${conventionsContent}\n` : "",
     rulesBlock,
+    hasKnowledge ? `${knowledgeBlock}\n` : "",
     "Pull request diff:",
     "```diff",
     diff,

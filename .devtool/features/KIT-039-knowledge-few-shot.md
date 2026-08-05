@@ -1,12 +1,13 @@
 ---
 id: "KIT-039"
-status: "backlog"
+status: "done"
 priority: "high"
 assignee: ""
 epic: "v7-deep-context"
 dueDate: null
 created: "2026-08-05"
 modified: "2026-08-05"
+completedAt: "2026-08-05"
 labels: ["deep-context", "knowledge", "prompt"]
 order: "e5"
 ---
@@ -33,16 +34,18 @@ See [US-034](../../docs/stories/US-034-knowledge-calibrated-reviews.md).
 2. Query text = the diff (truncated to Voyage input limit) — simplest relevance anchor.
 3. Retrieval failure NEVER fails the review (epic error table).
 
+**Execution note:** knowledge fetch happens in `pipeline.ts` step 5b (client created from env, one search, client closed immediately); block passed as a new optional trailing param of `buildReviewPrompt` / `buildAgenticPrompt`, guardrail block emitted by `buildGuardrailSystem(config, hasKnowledge)`. `knowledge_top_k` added to `.reviewer.yml` schema (`knowledgeTopK`, default 5). Manual/negative checks on a live cluster run under KIT-040's e2e.
+
 **Risks:** prompt growth — entries capped (topK × content length cap at insert time).
 
 ## Implementation Plan
 
-1. - [ ] RED: `tests/prompt/knowledge-block.test.ts` — block formatting; fetch success/empty/error paths (mocked client). FAIL.
-2. - [ ] GREEN: module. PASS.
-3. - [ ] RED: pipeline tests — with mocked client, both paths carry the block; unset env → no block, no warning noise; client error → warning + review completes. FAIL.
-4. - [ ] GREEN: pipeline + prompt wiring + `knowledge_top_k` config. PASS.
-5. - [ ] Commit: `feat(reviewer): inject repository knowledge as few-shot review context`
-6. - [ ] `pnpm test && pnpm lint` green.
+1. - [x] RED: `tests/prompt/knowledge-block.test.ts` — block formatting; fetch success/empty/error paths (mocked client). FAIL.
+2. - [x] GREEN: module. PASS.
+3. - [x] RED: pipeline tests — with mocked client, both paths carry the block; unset env → no block, no warning noise; client error → warning + review completes. FAIL.
+4. - [x] GREEN: pipeline + prompt wiring + `knowledge_top_k` config. PASS.
+5. - [x] Commit: `feat(reviewer): inject repository knowledge as few-shot review context`
+6. - [x] `pnpm test && pnpm lint` green.
 
 ## How to Test
 

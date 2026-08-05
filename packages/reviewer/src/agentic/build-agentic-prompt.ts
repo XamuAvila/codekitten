@@ -28,11 +28,13 @@ export function buildAgenticPrompt(
   conventionsContent: string | undefined,
   mcpConfig: MCPConfig,
   maxTurns?: number,
+  knowledgeBlock?: string,
 ): BuiltPrompt {
   const turns = maxTurns ?? mcpConfig.maxTurns;
+  const hasKnowledge = knowledgeBlock !== undefined && knowledgeBlock !== "";
 
   const system = [
-    buildGuardrailSystem(config),
+    buildGuardrailSystem(config, hasKnowledge),
     "",
     "AGENTIC EXPLORATION:",
     "- Explore before reporting: use the tools to inspect the repo beyond the diff — read changed files in full, search for usages and patterns, find related code. Do not guess what is in the repo — look it up.",
@@ -56,6 +58,7 @@ export function buildAgenticPrompt(
   const user = [
     conventionsContent ? `Repository conventions:\n${conventionsContent}\n` : "",
     rulesBlock,
+    hasKnowledge ? `${knowledgeBlock}\n` : "",
     "Pull request diff:",
     "```diff",
     diff,

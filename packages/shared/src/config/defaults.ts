@@ -20,4 +20,5 @@ export const DEFAULT_CONFIG: ReviewerConfig = {
   skip: ["**/Migrations/**", "*.Designer.cs", "**/*.snap", "**/node_modules/**"],
   conventionsFile: "CLAUDE.md",
   rules: [],
+  knowledgeTopK: 5,
 };

@@ -38,6 +38,7 @@ describe("parseReviewerConfig", () => {
       skip: ["**/dist/**"],
       conventionsFile: "AGENTS.md",
       rules: [],
+      knowledgeTopK: 5,
     });
   });
 
@@ -131,4 +132,11 @@ reviewer:
     expect(config.maxFindings).toBe(DEFAULT_CONFIG.maxFindings);
     expect(config.maxComplexity).toBe(DEFAULT_CONFIG.maxComplexity);
   });
+
+  it("parses knowledge_top_k and defaults it to 5 (KIT-039)", () => {
+    const parsed = parseReviewerConfig("reviewer:\n  knowledge_top_k: 8\n");
+    expect(parsed.knowledgeTopK).toBe(8);
+    expect(parseReviewerConfig("").knowledgeTopK).toBe(5);
+  });
 });
+

@@ -144,3 +144,23 @@ describe("buildReviewPrompt", () => {
     expect(block).toContain("line");
   });
 });
+
+describe("knowledge block (KIT-039)", () => {
+  it("renders the knowledge block above the diff when provided", () => {
+    const { user } = buildReviewPrompt(DIFF, FILES, DEFAULT_CONFIG, undefined, "Repository knowledge:\n1. fact");
+    expect(user).toContain("Repository knowledge:");
+    expect(user.indexOf("Repository knowledge:")).toBeLessThan(user.indexOf("Pull request diff:"));
+  });
+
+  it("no knowledge block → prompt unchanged", () => {
+    const { user } = buildReviewPrompt(DIFF, FILES, DEFAULT_CONFIG);
+    expect(user).not.toContain("Repository knowledge:");
+  });
+
+  it("system prompt carries the calibration guardrail when knowledge present", () => {
+    const { system } = buildReviewPrompt(DIFF, FILES, DEFAULT_CONFIG, undefined, "Repository knowledge:\n1. fact");
+    expect(system).toContain("REPOSITORY KNOWLEDGE:");
+    expect(system.toLowerCase()).toContain("never relax");
+  });
+});
+
