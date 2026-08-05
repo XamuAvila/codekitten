@@ -7,6 +7,34 @@ import { postFollowUpAnswer } from "./github/comment.js";
 
 const DEFAULT_IDLE_TIMEOUT_MS = 600_000; // 10 minutes
 
+/**
+ * Serializes re-run requests: while one run is in flight, further calls
+ * collapse into AT MOST one queued re-run (a push burst re-reviews once —
+ * the fresh clone already carries every pushed commit). Prevents concurrent
+ * runPipeline executions in the Pod (KIT-032 risk 1).
+ */
+export function serializeReruns(fn: () => Promise<void>): () => Promise<void> {
+  let running = false;
+  let pending = false;
+
+  return async function run(): Promise<void> {
+    if (running) {
+      pending = true;
+      return;
+    }
+    running = true;
+    try {
+      await fn();
+    } finally {
+      running = false;
+      if (pending) {
+        pending = false;
+        void run();
+      }
+    }
+  };
+}
+
 export interface AgentConfig {
   readonly jobId: string;
   readonly redisUrl: string;
@@ -18,6 +46,8 @@ export interface AgentConfig {
   readonly onForce?: () => Promise<void>;
   /** Invoked when a follow-up message equals "stop" (KIT-016). */
   readonly onStop?: () => Promise<void>;
+  /** Invoked on a re_review message — push to the PR while the Pod lives (KIT-032). */
+  readonly onReReview?: () => Promise<void>;
   /** LLM config for follow-up answers (KIT-017). */
   readonly llmConfig?: ReviewerConfig;
   /** Review context — findings + original prompt (KIT-017). */
@@ -112,6 +142,9 @@ export async function startAgent(config: AgentConfig): Promise<void> {
       if (config.llmConfig && config.reviewContext && config.token && config.repo && config.prNumber) {
         void answerFollowUp(config, payload.message);
       }
+    } else if (msg.type === "re_review") {
+      console.log("[reviewer] re_review received — re-running the pipeline");
+      if (config.onReReview) void config.onReReview();
     } else if (msg.type === "shutdown") {
       console.log("[reviewer] Shutdown message received");
       void shutdown();

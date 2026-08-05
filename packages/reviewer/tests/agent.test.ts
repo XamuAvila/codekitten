@@ -253,6 +253,58 @@ describe("startAgent", () => {
     await agentPromise;
   });
 
+  it("dispatches re_review message to onReReview and resets the idle timer", async () => {
+    let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
+    mockSubscribeToChannel.mockImplementation(
+      async (_sub: unknown, _ch: unknown, handler: (msg: PubSubMessage) => void) => {
+      capturedHandler = handler;
+      return { unsubscribe: mockUnsubscribe };
+    });
+
+    const onReReview = vi.fn().mockResolvedValue(undefined);
+    const agentPromise = startAgent({ ...baseConfig, onReReview });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Just before the idle timeout, a re_review arrives — timer must reset
+    await vi.advanceTimersByTimeAsync(4000);
+    capturedHandler!({ type: "re_review", payload: {}, timestamp: "t" });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onReReview).toHaveBeenCalledTimes(1);
+
+    // 4s later the agent is still alive (timer was reset at 4s)
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(mockExit).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await agentPromise;
+  });
+
+  it("serializeReruns: concurrent calls queue at most one pending re-run", async () => {
+    const { serializeReruns } = await import("../src/agent.js");
+    let resolveFirst: () => void;
+    const first = new Promise<void>((r) => (resolveFirst = r));
+    const runs: number[] = [];
+    let call = 0;
+    const fn = vi.fn().mockImplementation(() => {
+      call += 1;
+      runs.push(call);
+      return call === 1 ? first : Promise.resolve();
+    });
+    const serialized = serializeReruns(fn);
+
+    void serialized(); // starts run 1
+    void serialized(); // queued
+    void serialized(); // collapsed into the same queued run
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    resolveFirst!();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fn).toHaveBeenCalledTimes(2); // 1 running + 1 queued, third collapsed
+  });
+
   it("does not dispatch onForce for a regular follow-up question", async () => {
     let capturedHandler: ((msg: PubSubMessage) => void) | undefined;
     mockSubscribeToChannel.mockImplementation(

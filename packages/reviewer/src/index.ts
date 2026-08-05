@@ -2,7 +2,7 @@ import { pathToFileURL } from "node:url";
 import { AppError } from "@kitten/shared";
 import { Redis } from "ioredis";
 import { runPipeline } from "./pipeline.js";
-import { startAgent } from "./agent.js";
+import { startAgent, serializeReruns } from "./agent.js";
 import { reportStatus } from "./redis/status.js";
 import { subscribeToChannel } from "./redis/pubsub.js";
 import { postReviewComment } from "./github/comment.js";
@@ -112,6 +112,21 @@ export async function main(): Promise<void> {
     }
   };
 
+  // `re_review` (push to the PR while the Pod lives, KIT-032): re-run the
+  // pipeline — the fresh clone picks up the new head. Serialized: concurrent
+  // pushes collapse into at most one queued re-run.
+  const onReReview = serializeReruns(async (): Promise<void> => {
+    console.log("[reviewer] re_review — re-running pipeline for the updated head");
+    try {
+      await reportStatus(redis, config.jobId, "running");
+      await runPipeline(config, { signal: controller.signal });
+      await reportStatus(redis, config.jobId, "reviewing");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[reviewer] Re-review failed: ${message}`);
+    }
+  });
+
   // `stop` on a completed pipeline → clean shutdown with cancelled status (KIT-016)
   const onStop = async (): Promise<void> => {
     console.log("[reviewer] stop received — shutting down");
@@ -135,6 +150,7 @@ export async function main(): Promise<void> {
     prNumber: config.prNumber,
     onForce,
     onStop,
+    onReReview,
     // KIT-017: follow-up answers reuse the review's config + context
     llmConfig: result.llmConfig,
     reviewContext: result.findings
