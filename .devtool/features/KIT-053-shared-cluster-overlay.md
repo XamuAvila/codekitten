@@ -157,25 +157,25 @@ must say, so it is settled before any file is written.
    Expected: prints `valid`, and `grep -n 'apply -k' .github/workflows/deploy.yml`
    shows the variable, not a literal `k8s`.
 8. - [x] Commit: `feat(ci): make the deploy kustomize path configurable`
-9. - [ ] `docs/configuration.md`: add `REVIEWER_POD_SCHEDULING` to the
+9. - [x] `docs/configuration.md`: add `REVIEWER_POD_SCHEDULING` to the
    dispatcher table, a scheduling subsection carrying the
    ServiceAccount-must-exist caveat, and `KUSTOMIZE_PATH` to the deployment
    tooling table. Expected: the three new entries exist and no existing row is
    contradicted.
-10. - [ ] `docs/deployment.md`: a shared-cluster section plus three
+10. - [x] `docs/deployment.md`: a shared-cluster section plus three
     troubleshooting rows — `FailedScheduling`, PVC `Pending` blocking the Pod,
     and CI reverting the overlay when `KUSTOMIZE_PATH` is unset. Expected: the
     PVC row states the outcome recorded in step 1, verbatim.
-11. - [ ] `docs/architecture.md` and `README.md`: note that the reviewer Pod
+11. - [x] `docs/architecture.md` and `README.md`: note that the reviewer Pod
     spec is generated in code, which three fields an operator can influence, and
     one line pointing at the overlay.
-12. - [ ] `CHANGELOG.md`: Unreleased/Added entries for the overlay, the
+12. - [x] `CHANGELOG.md`: Unreleased/Added entries for the overlay, the
     scheduling variable and `KUSTOMIZE_PATH`.
-13. - [ ] Verify no doc link broke.
+13. - [x] Verify no doc link broke.
     Command: the link check from the docs work — every relative link in
     `README.md`, `docs/*.md` resolves to an existing file.
     Expected: zero broken.
-14. - [ ] `pnpm test && pnpm lint` green (no runtime code touched); commit:
+14. - [x] `pnpm test && pnpm lint` green (no runtime code touched); commit:
     `docs: shared-cluster deployment and reviewer Pod scheduling`
 
 ## How to Test
