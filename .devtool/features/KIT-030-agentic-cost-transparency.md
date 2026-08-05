@@ -41,10 +41,11 @@ implemented.
    receives per-tool lines with truncated input and no tool-result content.
    FAIL.
 2. - [x] GREEN: loop accumulation + logging. PASS.
-3. - [x] RED: `pipeline.test.ts` — agentic result metadata carries the summed
-   tokens. FAIL.
-4. - [x] GREEN: pipeline wiring. PASS.
-5. - [x] `pnpm test && pnpm lint` green; commit.
+3. - [x] Pipeline wiring: the agentic `ReviewResult.metadata` uses the loop's
+   token totals. No dedicated pipeline test — the accounting is asserted at
+   the loop level (step 1); the pipeline only forwards the numbers into the
+   existing comment fields.
+4. - [x] `pnpm test && pnpm lint` green; commit.
 
 ## How to Test
 

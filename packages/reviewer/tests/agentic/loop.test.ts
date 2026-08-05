@@ -299,6 +299,37 @@ describe("runAgenticLoop", () => {
     expect(adapter.explore).toHaveBeenCalledTimes(1);
   });
 
+  it("sums turn tokens and logs per-tool lines without result content (US-027 AC-4)", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const adapter = makeAdapter([
+      {
+        toolUses: [{ name: "read_file", input: { path: "a.ts" } }],
+        metadata: { inputTokens: 100, outputTokens: 40, durationMs: 1 },
+      },
+      {
+        toolUses: [{ name: "report_findings", input: { findings: [] } }],
+        metadata: { inputTokens: 200, outputTokens: 60, durationMs: 1 },
+      },
+    ]);
+
+    const result = await runAgenticLoop(adapter, PROMPT, DEFAULT_MCP_CONFIG, {
+      registry: makeRegistry(),
+      maxOutputTokens: 8000,
+    });
+
+    expect(result.inputTokens).toBe(300);
+    expect(result.outputTokens).toBe(100);
+
+    const lines = log.mock.calls.map((c) => String(c[0]));
+    const toolLine = lines.find((l) => l.includes("read_file"));
+    expect(toolLine).toBeDefined();
+    expect(toolLine).toMatch(/Turn 1\/\d+/);
+    expect(toolLine).toContain('"path":"a.ts"');
+    expect(toolLine).not.toContain("const a = 1;"); // tool RESULT content never logged
+    expect(lines.some((l) => /Turn 1\/\d+: 100 in \/ 40 out tokens/.test(l))).toBe(true);
+    log.mockRestore();
+  });
+
   it("counts executed tool calls", async () => {
     const adapter = makeAdapter([
       {

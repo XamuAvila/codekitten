@@ -22,6 +22,9 @@ export interface AgenticLoopResult {
   readonly hitBudget: boolean;
   /** True when the stop signal aborted the loop (status cancelled). */
   readonly aborted: boolean;
+  /** Tokens summed across all explore turns (US-027 AC-4). */
+  readonly inputTokens: number;
+  readonly outputTokens: number;
 }
 
 /**
@@ -47,11 +50,13 @@ export async function runAgenticLoop(
   let toolCalls = 0;
   let textOnlyStreak = 0;
   let callId = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   for (let turn = 0; turn <= maxTurns; turn += 1) {
     if (opts.signal?.aborted) {
       console.log("[reviewer] Agentic loop aborted by stop command");
-      return { findings: [], toolCalls, hitBudget: false, aborted: true };
+      return { findings: [], toolCalls, hitBudget: false, aborted: true, inputTokens, outputTokens };
     }
 
     const isFinalize = turn === maxTurns || textOnlyStreak >= 2;
@@ -68,6 +73,11 @@ export async function runAgenticLoop(
         }),
       { isRetryable: (error) => !isAuthError(error) },
     );
+    inputTokens += result.metadata.inputTokens;
+    outputTokens += result.metadata.outputTokens;
+    console.log(
+      `[reviewer] Turn ${turn + 1}/${maxTurns + 1}: ${result.metadata.inputTokens} in / ${result.metadata.outputTokens} out tokens`,
+    );
 
     const report = result.toolUses.find((use) => use.name === REPORT_TOOL);
     if (report) {
@@ -82,7 +92,7 @@ export async function runAgenticLoop(
             "[reviewer] Agentic review reported without exploring — findings may be weaker than v3 monolithic",
           );
         }
-        return { findings: parsed.data, toolCalls, hitBudget: turn >= maxTurns, aborted: false };
+        return { findings: parsed.data, toolCalls, hitBudget: turn >= maxTurns, aborted: false, inputTokens, outputTokens };
       }
       if (isFinalize) {
         throw new AppError("LLM_OUTPUT_INVALID", "Agentic finalize turn produced invalid findings", [
@@ -130,8 +140,14 @@ export async function runAgenticLoop(
         });
         continue;
       }
+      const toolStart = Date.now();
       const executed = await tool.execute(use.input, opts.registry.ctx);
       toolCalls += 1;
+      // Input logged truncated; tool RESULT content never logged — repo file
+      // contents may hold secrets (invariant 4).
+      console.log(
+        `[reviewer] Turn ${turn + 1}/${maxTurns + 1}: ${use.name}(${JSON.stringify(use.input).slice(0, 120)}) ${Date.now() - toolStart}ms`,
+      );
       results.push({
         id: use.id,
         content: executed.truncated ? `${executed.content}\n[truncated]` : executed.content,

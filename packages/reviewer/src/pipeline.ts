@@ -178,8 +178,8 @@ export async function runPipeline(
             conventionsStatus: [],
             metadata: {
               model: reviewerConfig.config.model,
-              inputTokens: 0,
-              outputTokens: 0,
+              inputTokens: loop.inputTokens,
+              outputTokens: loop.outputTokens,
               durationMs: 0,
             },
           },
