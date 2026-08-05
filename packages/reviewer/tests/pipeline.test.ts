@@ -707,6 +707,21 @@ describe("runPipeline", () => {
       expect(bodies.some((b) => /force/i.test(b))).toBe(false);
     });
 
+    it("aborted agentic loop posts nothing (US-027 AC-3)", async () => {
+      enableAgenticFs(JSON.stringify({ enabled: true }));
+      const controller = new AbortController();
+      controller.abort();
+      const mockExplore = vi.fn();
+      mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });
+
+      const result = await runPipeline(baseConfig, { signal: controller.signal });
+
+      expect(result.status).toBe("completed");
+      expect(result.findings ?? []).toEqual([]);
+      expect(mockCreateReview).not.toHaveBeenCalled();
+      expect(mockCreateComment).not.toHaveBeenCalled();
+    });
+
     it("no file → v3 path, no agentic call", async () => {
       const mockExplore = vi.fn();
       mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });

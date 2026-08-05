@@ -152,6 +152,25 @@ export async function runPipeline(
         agenticToolCalls = loop.toolCalls;
         agenticHitBudget = loop.hitBudget;
         console.log(`[reviewer] Agentic loop done: ${loop.toolCalls} tool calls, hitBudget=${loop.hitBudget}${loop.aborted ? ", aborted" : ""}`);
+        if (loop.aborted) {
+          // Stop command: post NOTHING — cancellation status and the
+          // "Review cancelled" comment come from onStop (KIT-016 plumbing).
+          return {
+            status: "completed",
+            dryRun: false,
+            diff,
+            findings: [],
+            prompt,
+            llmConfig: reviewerConfig.config,
+            mcpConfig,
+            metadata: {
+              repo: config.repo,
+              prNumber: config.prNumber,
+              durationMs: Date.now() - start,
+              toolCalls: loop.toolCalls,
+            },
+          };
+        }
         results.push({
           result: {
             findings: loop.findings,
