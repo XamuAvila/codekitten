@@ -71,6 +71,46 @@ The board + cards are the **single source of truth for project progress** — th
 
 Ending a session with the board not reflecting reality = process violation.
 
+### Bugs-in-waiting close with the epic (zero known debt)
+
+Any bug-in-waiting, gap, or tech debt discovered **while executing an epic**
+(plan step diverging from behavior, missing guard, dead spec promise) MUST be
+folded into the plan being executed — as a new card in the same epic, ordered
+before the epic closes. An epic is NOT done while a known bug or debt item
+discovered during it remains open:
+
+1. **Discover → card immediately** (same rule as "new work discovered
+   mid-task"), tagged with the epic and a `debt` or `bug` label.
+2. **Epic close gate**: before setting an epic's status to done, sweep every
+   plan promise (epic error table, budget rules, testing table, each card's
+   "How to Test") against the implementation. Divergence → card → fix or
+   explicit user decision to defer. Deferring is the USER's call, recorded in
+   the epic body — never silent.
+3. Silent deferral of a known bug past epic close = process violation, same
+   severity as a board out of sync.
+
+### Docs alignment (divergence is worse than a critical bug)
+
+Docs (epic files, cards, stories, AGENTS.md, README) must describe the
+implementation with 100% fidelity at all times. A wrong doc misleads every
+future session and multiplies bugs; treat divergence as MORE severe than a
+critical bug — a critical bug fails one review, a wrong doc corrupts every
+plan built on it.
+
+1. **Same-commit rule**: any change that invalidates a doc statement (file
+   path, behavior, flow, default, error code) updates that doc in the same
+   commit — never "later".
+2. **Card fidelity**: when the implementation legitimately deviates from a
+   card's refinement/plan (better design found mid-TDD), edit the card to
+   record what was ACTUALLY built and why, before moving it to done. Cards
+   describing files or steps that never happened are divergences.
+3. **Epic close alignment pass**: closing an epic includes a docs-alignment
+   sweep — epic architecture/testing/error sections, all its cards, stories
+   INDEX, and AGENTS.md examples must match the shipped code. The epic is not
+   done until this pass is clean.
+4. Found a divergence you cannot fix now? Card it immediately (`docs` label)
+   and surface it to the user — never leave it undocumented.
+
 ## Local setup
 
 ```bash
