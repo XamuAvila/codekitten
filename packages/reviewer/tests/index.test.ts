@@ -13,6 +13,7 @@ vi.mock("../src/pipeline.js", () => ({
 
 vi.mock("../src/agent.js", () => ({
   startAgent: (...args: unknown[]) => mockStartAgent(...args),
+  serializeReruns: (fn: () => Promise<void>) => fn,
 }));
 
 vi.mock("../src/redis/status.js", () => ({
