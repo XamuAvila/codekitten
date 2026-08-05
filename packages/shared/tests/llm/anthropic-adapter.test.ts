@@ -144,6 +144,92 @@ describe("AnthropicAdapter", () => {
     await expect(adapter.review(makeContext())).rejects.toThrow();
   });
 
+  describe("explore", () => {
+    const TOOLS = [
+      { name: "read_file", description: "Read a file", inputSchema: { type: "object" } },
+      { name: "report_findings", description: "Report findings", inputSchema: { type: "object" } },
+    ];
+
+    function makeTurn(overrides?: Partial<{ forcedToolChoice: { name: string } }>) {
+      return {
+        system: "explore system",
+        messages: [{ role: "user" as const, content: "explore the repo" }],
+        tools: TOOLS,
+        maxOutputTokens: 8000,
+        ...overrides,
+      };
+    }
+
+    it("sends the tools array with tool_choice auto", async () => {
+      mockCreate.mockResolvedValue({ content: [], usage: { input_tokens: 5, output_tokens: 2 } });
+      const adapter = new AnthropicAdapter({ apiKey: "test-key", baseUrl: "https://api.anthropic.com" });
+
+      await adapter.explore(makeTurn());
+
+      const [params] = mockCreate.mock.calls[0];
+      expect(params.tools).toHaveLength(2);
+      expect(params.tools[0]).toMatchObject({ name: "read_file", input_schema: { type: "object" } });
+      expect(params.tool_choice).toEqual({ type: "auto" });
+      expect(params.max_tokens).toBe(8000);
+      expect(params.system).toBe("explore system");
+      expect(params.thinking).toBeUndefined();
+    });
+
+    it("forces the named tool when forcedToolChoice is set", async () => {
+      mockCreate.mockResolvedValue({ content: [], usage: { input_tokens: 5, output_tokens: 2 } });
+      const adapter = new AnthropicAdapter({ apiKey: "test-key", baseUrl: "https://api.anthropic.com" });
+
+      await adapter.explore(makeTurn({ forcedToolChoice: { name: "report_findings" } }));
+
+      const [params] = mockCreate.mock.calls[0];
+      expect(params.tool_choice).toEqual({ type: "tool", name: "report_findings" });
+    });
+
+    it("keeps thinking disabled for the DeepSeek endpoint", async () => {
+      mockCreate.mockResolvedValue({ content: [], usage: { input_tokens: 5, output_tokens: 2 } });
+      const adapter = new AnthropicAdapter({ apiKey: "dk-key", baseUrl: "https://api.deepseek.com/anthropic" });
+
+      await adapter.explore(makeTurn());
+
+      const [params] = mockCreate.mock.calls[0];
+      expect(params.thinking).toEqual({ type: "disabled" });
+    });
+
+    it("parses tool_use blocks into toolUses and text into text", async () => {
+      mockCreate.mockResolvedValue({
+        content: [
+          { type: "text", text: "Let me read the file." },
+          { type: "tool_use", id: "t1", name: "read_file", input: { path: "src/a.ts" } },
+          { type: "tool_use", id: "t2", name: "search", input: { query: "foo" } },
+        ],
+        usage: { input_tokens: 100, output_tokens: 40 },
+      });
+      const adapter = new AnthropicAdapter({ apiKey: "test-key", baseUrl: "https://api.anthropic.com" });
+
+      const result = await adapter.explore(makeTurn());
+
+      expect(result.text).toBe("Let me read the file.");
+      expect(result.toolUses).toEqual([
+        { name: "read_file", input: { path: "src/a.ts" } },
+        { name: "search", input: { query: "foo" } },
+      ]);
+      expect(result.metadata).toMatchObject({ inputTokens: 100, outputTokens: 40 });
+    });
+
+    it("returns empty toolUses for a text-only response", async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: "text", text: "just text" }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+      const adapter = new AnthropicAdapter({ apiKey: "test-key", baseUrl: "https://api.anthropic.com" });
+
+      const result = await adapter.explore(makeTurn());
+
+      expect(result.toolUses).toEqual([]);
+      expect(result.text).toBe("just text");
+    });
+  });
+
   it("respond returns the text answer for follow-up questions", async () => {
     mockCreate.mockResolvedValue({
       content: [{ type: "text", text: "The change moves validation to the service layer." }],

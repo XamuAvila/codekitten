@@ -9,7 +9,9 @@ export type AppErrorCode =
   | "AUTH_FAILED"
   | "RATE_LIMITED"
   | "UNPROCESSABLE"
-  | "GITHUB_API_ERROR";
+  | "GITHUB_API_ERROR"
+  | "LLM_OUTPUT_INVALID"
+  | "UNKNOWN_TOOL";
 
 export interface AppErrorDetail {
   readonly [key: string]: unknown;

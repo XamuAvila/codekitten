@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import type { Finding, ReviewResult } from "../types/index.js";
 import { FindingSchema } from "../types/index.js";
-import type { LLMAdapter, ReviewContext } from "./adapter.js";
+import type { AgentTurn, ExploreResult, LLMAdapter, ReviewContext } from "./adapter.js";
 
 /**
  * OpenAIAdapter — LLM review via the OpenAI SDK using
@@ -51,6 +51,44 @@ export class OpenAIAdapter implements LLMAdapter {
         inputTokens: response.usage?.prompt_tokens ?? 0,
         outputTokens: response.usage?.completion_tokens ?? 0,
         durationMs: 0,
+      },
+    };
+  }
+
+  async explore(turn: AgentTurn): Promise<ExploreResult> {
+    const start = Date.now();
+    const response = await this.client.chat.completions.create({
+      model: this.defaultModel,
+      max_tokens: turn.maxOutputTokens,
+      messages: [
+        { role: "system", content: turn.system },
+        // ChatMessage content blocks are provider-shaped pass-through
+        ...(turn.messages as unknown as OpenAI.ChatCompletionMessageParam[]),
+      ],
+      tools: turn.tools.map((tool) => ({
+        type: "function" as const,
+        function: { name: tool.name, description: tool.description, parameters: tool.inputSchema },
+      })),
+      tool_choice: turn.forcedToolChoice
+        ? { type: "function", function: { name: turn.forcedToolChoice.name } }
+        : "auto",
+    });
+
+    const message = response.choices[0]?.message;
+    const toolUses = (message?.tool_calls ?? [])
+      .filter((call): call is Extract<typeof call, { type: "function" }> => call.type === "function")
+      .map((call) => ({
+        name: call.function.name,
+        input: JSON.parse(call.function.arguments || "{}") as Record<string, unknown>,
+      }));
+
+    return {
+      ...(message?.content ? { text: message.content } : {}),
+      toolUses,
+      metadata: {
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
+        durationMs: Date.now() - start,
       },
     };
   }

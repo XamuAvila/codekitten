@@ -100,6 +100,96 @@ describe("OpenAIAdapter", () => {
     await expect(adapter.review(makeContext())).rejects.toThrow();
   });
 
+  describe("explore", () => {
+    const TOOLS = [
+      { name: "read_file", description: "Read a file", inputSchema: { type: "object" } },
+      { name: "report_findings", description: "Report findings", inputSchema: { type: "object" } },
+    ];
+
+    function makeTurn(overrides?: Partial<{ forcedToolChoice: { name: string } }>) {
+      return {
+        system: "explore system",
+        messages: [{ role: "user" as const, content: "explore the repo" }],
+        tools: TOOLS,
+        maxOutputTokens: 8000,
+        ...overrides,
+      };
+    }
+
+    it("sends tools with tool_choice auto", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: null, tool_calls: [] } }],
+        usage: { prompt_tokens: 5, completion_tokens: 2 },
+      });
+      const adapter = new OpenAIAdapter({ apiKey: "oa-key", baseUrl: "https://api.openai.com" });
+
+      await adapter.explore(makeTurn());
+
+      const [params] = mockCreate.mock.calls[0];
+      expect(params.tools).toHaveLength(2);
+      expect(params.tools[0]).toMatchObject({
+        type: "function",
+        function: { name: "read_file", parameters: { type: "object" } },
+      });
+      expect(params.tool_choice).toBe("auto");
+      expect(params.max_tokens).toBe(8000);
+      expect(params.messages[0]).toEqual({ role: "system", content: "explore system" });
+    });
+
+    it("forces the named function when forcedToolChoice is set", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: null, tool_calls: [] } }],
+        usage: { prompt_tokens: 5, completion_tokens: 2 },
+      });
+      const adapter = new OpenAIAdapter({ apiKey: "oa-key", baseUrl: "https://api.openai.com" });
+
+      await adapter.explore(makeTurn({ forcedToolChoice: { name: "report_findings" } }));
+
+      const [params] = mockCreate.mock.calls[0];
+      expect(params.tool_choice).toEqual({ type: "function", function: { name: "report_findings" } });
+    });
+
+    it("parses tool_calls into toolUses and content into text", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: "Reading files.",
+              tool_calls: [
+                { id: "c1", type: "function", function: { name: "read_file", arguments: '{"path":"src/a.ts"}' } },
+                { id: "c2", type: "function", function: { name: "search", arguments: '{"query":"foo"}' } },
+              ],
+            },
+          },
+        ],
+        usage: { prompt_tokens: 100, completion_tokens: 40 },
+      });
+      const adapter = new OpenAIAdapter({ apiKey: "oa-key", baseUrl: "https://api.openai.com" });
+
+      const result = await adapter.explore(makeTurn());
+
+      expect(result.text).toBe("Reading files.");
+      expect(result.toolUses).toEqual([
+        { name: "read_file", input: { path: "src/a.ts" } },
+        { name: "search", input: { query: "foo" } },
+      ]);
+      expect(result.metadata).toMatchObject({ inputTokens: 100, outputTokens: 40 });
+    });
+
+    it("returns empty toolUses for a text-only response", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: "just text" } }],
+        usage: { prompt_tokens: 1, completion_tokens: 1 },
+      });
+      const adapter = new OpenAIAdapter({ apiKey: "oa-key", baseUrl: "https://api.openai.com" });
+
+      const result = await adapter.explore(makeTurn());
+
+      expect(result.toolUses).toEqual([]);
+      expect(result.text).toBe("just text");
+    });
+  });
+
   it("respond returns the text answer for follow-ups", async () => {
     mockCreate.mockResolvedValue({
       choices: [{ message: { content: "The refactor looks safe." } }],

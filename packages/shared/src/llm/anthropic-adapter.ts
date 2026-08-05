@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Finding, ReviewResult } from "../types/index.js";
 import { FindingSchema } from "../types/index.js";
-import type { LLMAdapter, ReviewContext, ReviewFile } from "./adapter.js";
+import type { AgentTurn, ExploreResult, LLMAdapter, ReviewContext, ReviewFile } from "./adapter.js";
 
 /**
  * The tool the model must call with its findings. The input_schema mirrors
@@ -75,6 +75,41 @@ export class AnthropicAdapter implements LLMAdapter {
         inputTokens: response.usage?.input_tokens ?? 0,
         outputTokens: response.usage?.output_tokens ?? 0,
         durationMs: 0,
+      },
+    };
+  }
+
+  async explore(turn: AgentTurn): Promise<ExploreResult> {
+    const start = Date.now();
+    const response = await this.client.messages.create({
+      model: this.defaultModel,
+      max_tokens: turn.maxOutputTokens,
+      system: turn.system,
+      // ChatMessage content blocks are provider-shaped pass-through
+      messages: turn.messages as unknown as Parameters<typeof this.client.messages.create>[0]["messages"],
+      tools: turn.tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema as { type: "object"; [key: string]: unknown },
+      })),
+      tool_choice: turn.forcedToolChoice
+        ? { type: "tool", name: turn.forcedToolChoice.name }
+        : { type: "auto" },
+      ...(this.disableThinking ? { thinking: { type: "disabled" } } : {}),
+    });
+
+    const textBlock = response.content.find((block) => block.type === "text");
+    const toolUses = response.content
+      .filter((block): block is Extract<typeof block, { type: "tool_use" }> => block.type === "tool_use")
+      .map((block) => ({ name: block.name, input: block.input as Record<string, unknown> }));
+
+    return {
+      ...(textBlock?.type === "text" ? { text: textBlock.text } : {}),
+      toolUses,
+      metadata: {
+        inputTokens: response.usage?.input_tokens ?? 0,
+        outputTokens: response.usage?.output_tokens ?? 0,
+        durationMs: Date.now() - start,
       },
     };
   }
