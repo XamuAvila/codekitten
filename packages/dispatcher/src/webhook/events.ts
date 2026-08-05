@@ -6,6 +6,7 @@ import type { K8sClient } from "../k8s/client.js";
 import { buildPodName } from "../k8s/manifest.js";
 import type { PodConfig } from "../k8s/manifest.js";
 import { dispatchReview } from "./dispatch.js";
+import { publishFollowUp, TERMINAL_STATUSES } from "./follow-up.js";
 import type { RouteEventResult } from "../routes/webhook.js";
 
 export interface EventRouterDeps {
@@ -14,8 +15,6 @@ export interface EventRouterDeps {
   readonly podConfig: PodConfig;
   readonly triggerWord: string;
 }
-
-const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
 const HANDLED_PR_ACTIONS = new Set(["opened", "reopened", "synchronize"]);
 
@@ -50,7 +49,63 @@ export async function routeEvent(
   if (event === "pull_request") {
     return handlePullRequest(payload, deps);
   }
+  if (event === "issue_comment") {
+    return handleIssueComment(payload, deps);
+  }
   return { ignored: true };
+}
+
+const IssueCommentEventSchema = z
+  .object({
+    action: z.string(),
+    issue: z
+      .object({
+        number: z.number().int().positive(),
+        // Present only when the issue IS a pull request
+        pull_request: z.object({}).loose().optional(),
+      })
+      .loose(),
+    comment: z
+      .object({
+        body: z.string(),
+        user: z.object({ login: z.string().min(1), type: z.string().optional() }).loose(),
+      })
+      .loose(),
+    repository: z.object({ full_name: z.string().min(1) }).loose(),
+  })
+  .loose();
+
+async function handleIssueComment(payload: unknown, deps: EventRouterDeps): Promise<RouteEventResult> {
+  const parsed = IssueCommentEventSchema.safeParse(payload);
+  if (!parsed.success) {
+    console.warn(`[dispatcher] Malformed issue_comment payload ignored: ${parsed.error.issues[0]?.path.join(".")}`);
+    return { ignored: true };
+  }
+
+  const data = parsed.data;
+  if (data.action !== "created") return { ignored: true };
+  if (!data.issue.pull_request) return { ignored: true }; // plain issue, not a PR
+  // Bot filter is mandatory: the reviewer posts comments itself — without
+  // this, a trigger word inside a reviewer comment would self-trigger.
+  if (data.comment.user.type === "Bot") return { ignored: true };
+
+  // Trigger match is prefix-only, case-insensitive (KIT-033 decision 3)
+  const body = data.comment.body.trim();
+  if (!body.toLowerCase().startsWith(deps.triggerWord.toLowerCase())) {
+    return { ignored: true };
+  }
+  const text = body.slice(deps.triggerWord.length).trim();
+  const command = text.toLowerCase();
+  const message = command === "force" || command === "stop" ? command : text;
+  if (message === "") return { ignored: true };
+
+  const jobId = buildPodName(data.repository.full_name, data.issue.number);
+  const sent = await publishFollowUp(deps.redis, jobId, message, data.comment.user.login);
+  if (!sent) {
+    console.log(`[dispatcher] Comment command for inactive job ${jobId} ignored`);
+    return { ignored: true };
+  }
+  return { jobId, status: "sent" };
 }
 
 async function handlePullRequest(payload: unknown, deps: EventRouterDeps): Promise<RouteEventResult> {

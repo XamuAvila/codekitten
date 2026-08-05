@@ -119,4 +119,86 @@ describe("routeEvent — pull_request", () => {
     const result = await routeEvent("star", {}, deps);
     expect(result).toEqual({ ignored: true });
   });
+
+  describe("issue_comment", () => {
+    function commentPayload(body: string, overrides?: Record<string, unknown>) {
+      return {
+        action: "created",
+        issue: { number: 42, pull_request: { url: "https://api.github.com/..." } },
+        comment: { body, user: { login: "dev", type: "User" } },
+        repository: { full_name: "octo/repo" },
+        sender: { login: "dev", type: "User" },
+        ...overrides,
+      };
+    }
+
+    it("@reviewer force on an active job → publishes follow_up 'force'", async () => {
+      setActiveStatus("review-octo-repo-42", "reviewing");
+
+      const result = await routeEvent("issue_comment", commentPayload("@reviewer force"), deps);
+
+      expect(publish).toHaveBeenCalledTimes(1);
+      const [channel, raw] = publish.mock.calls[0];
+      expect(channel).toBe("review:review-octo-repo-42:messages");
+      const msg = JSON.parse(raw);
+      expect(msg.type).toBe("follow_up");
+      expect(msg.payload).toEqual({ message: "force", sender: "dev" });
+      expect(result.status).toBe("sent");
+    });
+
+    it("@reviewer stop → publishes 'stop'", async () => {
+      setActiveStatus("review-octo-repo-42", "reviewing");
+
+      await routeEvent("issue_comment", commentPayload("@Reviewer STOP"), deps);
+
+      expect(JSON.parse(publish.mock.calls[0][1]).payload.message).toBe("stop");
+    });
+
+    it("@reviewer <question> → follow-up with trigger stripped", async () => {
+      setActiveStatus("review-octo-repo-42", "reviewing");
+
+      await routeEvent(
+        "issue_comment",
+        commentPayload("@reviewer why is finding 2 relevant?"),
+        deps,
+      );
+
+      expect(JSON.parse(publish.mock.calls[0][1]).payload.message).toBe("why is finding 2 relevant?");
+    });
+
+    it("comment without the trigger → ignored", async () => {
+      setActiveStatus("review-octo-repo-42", "reviewing");
+      const result = await routeEvent("issue_comment", commentPayload("nice PR!"), deps);
+      expect(result).toEqual({ ignored: true });
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it("bot author → ignored (feedback-loop guard)", async () => {
+      setActiveStatus("review-octo-repo-42", "reviewing");
+      const payload = commentPayload("@reviewer force", {
+        comment: { body: "@reviewer force", user: { login: "kitten[bot]", type: "Bot" } },
+        sender: { login: "kitten[bot]", type: "Bot" },
+      });
+
+      const result = await routeEvent("issue_comment", payload, deps);
+
+      expect(result).toEqual({ ignored: true });
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it("comment on a plain issue (no pull_request) → ignored", async () => {
+      setActiveStatus("review-octo-repo-42", "reviewing");
+      const payload = commentPayload("@reviewer force", { issue: { number: 42 } });
+
+      const result = await routeEvent("issue_comment", payload, deps);
+
+      expect(result).toEqual({ ignored: true });
+    });
+
+    it("terminal/unknown job → ignored with log, no error", async () => {
+      const result = await routeEvent("issue_comment", commentPayload("@reviewer force"), deps);
+      expect(result).toEqual({ ignored: true });
+      expect(publish).not.toHaveBeenCalled();
+    });
+  });
 });

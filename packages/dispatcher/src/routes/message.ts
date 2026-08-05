@@ -1,11 +1,8 @@
 import { Router } from "express";
 import type { Redis } from "ioredis";
 import { FollowUpMessageSchema, AppError } from "@kitten/shared";
-import type { ReviewJobStatus, PubSubMessage } from "@kitten/shared";
 import { validate } from "../middleware/validation.js";
-
-/** Terminal statuses — a follow-up to a completed/failed/cancelled job is rejected. */
-const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
+import { publishFollowUp } from "../webhook/follow-up.js";
 
 /**
  * POST /review/:jobId/message — publishes a follow-up message to the
@@ -30,32 +27,13 @@ export function createMessageRouter(redis: Redis): Router {
           throw new AppError("VALIDATION", "Missing jobId parameter");
         }
 
-        const raw = await redis.get(`review:${jobId}:status`);
-
-        if (!raw) {
-          throw new AppError("NOT_FOUND", `Job ${jobId} not found`);
-        }
-
-        const status: ReviewJobStatus = JSON.parse(raw);
-
-        if (TERMINAL_STATUSES.has(status.status)) {
-          throw new AppError("NOT_FOUND", `Job ${jobId} is no longer active`);
-        }
-
-        const pubSubMessage: PubSubMessage = {
-          type: "follow_up",
-          payload: req.body,
-          timestamp: new Date().toISOString(),
-        };
-
-        await redis.publish(
-          `review:${jobId}:messages`,
-          JSON.stringify(pubSubMessage),
-        );
-
+        // Active-check + publish shared with the webhook (webhook/follow-up.ts).
         // followUpCount is incremented by the Pod when it actually receives
-        // the message — the dispatcher publishes fire-and-forget and cannot
-        // know whether a live Pod consumed it.
+        // the message — publish is fire-and-forget.
+        const sent = await publishFollowUp(redis, jobId, req.body.message, req.body.sender);
+        if (!sent) {
+          throw new AppError("NOT_FOUND", `Job ${jobId} not found or no longer active`);
+        }
 
         res.json({ status: "sent" });
       } catch (err) {

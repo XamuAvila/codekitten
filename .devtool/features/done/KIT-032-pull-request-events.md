@@ -1,6 +1,7 @@
 ---
 id: "KIT-032"
-status: "in-progress"
+status: "done"
+completedAt: "2026-08-05"
 priority: "high"
 assignee: ""
 epic: "v5-github-webhook"
