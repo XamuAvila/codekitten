@@ -14,7 +14,8 @@
     "@octokit/rest": "^22.0.0",
     "ioredis": "^6.0.0",
     "picomatch": "^4.0.5",
-    "simple-git": "^3.36.0"
+    "simple-git": "^3.36.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
