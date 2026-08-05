@@ -36,3 +36,7 @@
 | US-028 | Automatic Review on PR Events | done | v5-github-webhook |
 | US-029 | PR Comment Commands | done | v5-github-webhook |
 | US-030 | Live Re-Review on Push | done | v5-github-webhook |
+| US-031 | Git History Tools | ready | v7-deep-context |
+| US-032 | Semantic Code Search | ready | v7-deep-context |
+| US-033 | Repository Knowledge | ready | v7-deep-context |
+| US-034 | Knowledge-Calibrated Reviews | ready | v7-deep-context |
