@@ -52,5 +52,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Public tunnel for the GitHub webhook (v7). Opt-in profile — exposes the
+  # MINIKUBE dispatcher (the one that can actually run reviews), not the
+  # compose one. Quick tunnel: no Cloudflare account, random trycloudflare
+  # URL printed in the logs:
+  #   TUNNEL_TARGET=$(minikube service kitten-dispatcher -n kitten --url) \
+  #     docker compose --profile webhook up -d tunnel
+  #   docker compose logs tunnel | grep trycloudflare
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["webhook"]
+    network_mode: host
+    command: tunnel --no-autoupdate --url ${TUNNEL_TARGET:-http://localhost:3001}
+    restart: unless-stopped
+
 volumes:
   mongo-data:
