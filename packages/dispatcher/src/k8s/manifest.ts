@@ -1,5 +1,6 @@
 import type { V1Pod } from "@kubernetes/client-node";
 import type { ReviewJob } from "@kitten/shared";
+import type { PodScheduling } from "./scheduling.js";
 
 /**
  * PodConfig — configuration for the reviewer Pod template.
@@ -14,6 +15,8 @@ export interface PodConfig {
   readonly sembleImage?: string;
   /** PVC name for the persistent Semble index — unset falls back to emptyDir. */
   readonly sembleIndexPvc?: string;
+  /** Scheduling controls for the reviewer Pod (v10). Absent → unchanged spec. */
+  readonly scheduling?: PodScheduling;
 }
 
 /** Fixed clone path shared with the sidecar — the Semble index key hashes
@@ -191,6 +194,19 @@ export function buildPodManifest(request: ReviewJob, config: PodConfig): V1Pod {
             ]
           : []),
       ],
+      // Scheduling controls (v10) — conditionally spread so absent scheduling
+      // leaves the spec byte-identical to the pre-v10 output. tolerations is
+      // spread-copied because the zod schema infers a readonly array while
+      // V1PodSpec.tolerations is a mutable Array<V1Toleration>.
+      ...(config.scheduling?.nodeSelector
+        ? { nodeSelector: config.scheduling.nodeSelector }
+        : {}),
+      ...(config.scheduling?.tolerations
+        ? { tolerations: [...config.scheduling.tolerations] }
+        : {}),
+      ...(config.scheduling?.serviceAccountName
+        ? { serviceAccountName: config.scheduling.serviceAccountName }
+        : {}),
       ...(withSidecar
         ? {
             volumes: [

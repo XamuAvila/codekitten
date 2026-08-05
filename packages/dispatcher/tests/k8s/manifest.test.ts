@@ -186,6 +186,35 @@ describe("buildPodManifest — semble sidecar (KIT-036)", () => {
   });
 });
 
+describe("buildPodManifest — scheduling (v10)", () => {
+  const scheduledConfig: PodConfig = {
+    ...sampleConfig,
+    scheduling: {
+      nodeSelector: { "workload-type": "kitten" },
+      tolerations: [
+        { key: "dedicated", operator: "Equal", value: "kitten", effect: "NoSchedule" },
+      ],
+      serviceAccountName: "kitten-reviewer",
+    },
+  };
+
+  it("no scheduling → spec carries none of the three fields", () => {
+    const pod = buildPodManifest(sampleJob, sampleConfig);
+    expect("nodeSelector" in pod.spec!).toBe(false);
+    expect("tolerations" in pod.spec!).toBe(false);
+    expect("serviceAccountName" in pod.spec!).toBe(false);
+  });
+
+  it("scheduling set → each field present with the supplied values", () => {
+    const pod = buildPodManifest(sampleJob, scheduledConfig);
+    expect(pod.spec?.nodeSelector).toEqual({ "workload-type": "kitten" });
+    expect(pod.spec?.tolerations).toEqual([
+      { key: "dedicated", operator: "Equal", value: "kitten", effect: "NoSchedule" },
+    ]);
+    expect(pod.spec?.serviceAccountName).toBe("kitten-reviewer");
+  });
+});
+
 describe("buildPodName", () => {
   it("produces lowercase deterministic name from repo and PR", () => {
     expect(buildPodName("octocat/Hello-World", 1)).toBe(
