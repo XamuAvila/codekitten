@@ -1,7 +1,7 @@
 ---
 id: v5-github-webhook
 title: "v5: GitHub Webhook"
-status: active
+status: done
 created: "2026-08-05"
 ---
 
@@ -105,7 +105,7 @@ type: "follow_up" | "shutdown" | "re_review";
 | `WEBHOOK_SECRET` unset | Route returns 503 `{ code: "SERVICE_UNAVAILABLE" }`, warning at boot |
 | Unhandled event/action | 200 `{ ignored: true }` |
 | Malformed payload for a handled event | 200 `{ ignored: true }` + warning log (GitHub must not retry forever) |
-| Pod creation fails | 500 via existing error handler (GitHub shows delivery failure — actionable) |
+| Pod creation fails | 503 `SERVICE_UNAVAILABLE` via `dispatchReview` + error handler (GitHub shows delivery failure — actionable) |
 | `re_review` publish with 0 subscribers | Fallback to `dispatchReview` (new Pod) |
 | Comment from a bot (`sender.type === "Bot"`) | Ignored — prevents feedback loops with the reviewer's own comments |
 

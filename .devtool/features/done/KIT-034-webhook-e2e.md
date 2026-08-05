@@ -1,6 +1,7 @@
 ---
 id: "KIT-034"
-status: "backlog"
+status: "done"
+completedAt: "2026-08-05"
 priority: "medium"
 assignee: ""
 epic: "v5-github-webhook"
@@ -48,13 +49,13 @@ See [US-028](../../docs/stories/US-028-auto-review-on-pr-events.md) (whole-flow 
 
 ## Implementation Plan
 
-1. - [ ] Fixtures: `pull-request-opened.json`, `pull-request-synchronize.json`, `issue-comment-stop.json`, `issue-comment-question.json`, `star.json` (ignored case).
-2. - [ ] `scripts/webhook-e2e.sh` with sign helper (`openssl dgst -sha256 -hmac`).
-3. - [ ] `minikube-setup.sh` secret seeding + manifests env.
-4. - [ ] Run on minikube — all assertions pass (opened → Pod; stop → cancelled; synchronize → in-place re-review; star → ignored).
-5. - [ ] AGENTS.md webhook setup section.
-6. - [ ] Commit: `feat: webhook e2e script, secret seeding, and setup docs`
-7. - [ ] `pnpm test && pnpm lint` green; docs-alignment sweep of the epic (close gate).
+1. - [x] Fixtures: `pull-request-opened.json`, `pull-request-synchronize.json`, `issue-comment-stop.json`, `issue-comment-question.json`, `star.json` (ignored case).
+2. - [x] `scripts/webhook-e2e.sh` with sign helper (`openssl dgst -sha256 -hmac`).
+3. - [x] `minikube-setup.sh` secret seeding + manifests env.
+4. - [x] Run on minikube — all assertions pass (opened → Pod; stop → cancelled; synchronize → in-place re-review; star → ignored).
+5. - [x] AGENTS.md webhook setup section.
+6. - [x] Commit: `feat: webhook e2e script, secret seeding, and setup docs`
+7. - [x] `pnpm test && pnpm lint` green; docs-alignment sweep of the epic (close gate).
 
 ## How to Test
 

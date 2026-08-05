@@ -1,0 +1,13 @@
+{
+  "action": "opened",
+  "number": 2,
+  "pull_request": {
+    "number": 2,
+    "state": "open",
+    "title": "Add feature",
+    "head": { "ref": "test/add-feature", "sha": "abc123" },
+    "base": { "ref": "master", "sha": "def456" }
+  },
+  "repository": { "full_name": "XamuAvila/kitten-test-repo", "private": false },
+  "sender": { "login": "XamuAvila", "type": "User" }
+}

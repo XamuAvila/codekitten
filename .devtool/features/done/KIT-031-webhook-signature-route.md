@@ -51,12 +51,12 @@ See [US-028](../../docs/stories/US-028-auto-review-on-pr-events.md) (AC-2, AC-3,
 
 ## Implementation Plan
 
-1. - [ ] RED: `packages/dispatcher/tests/webhook-signature.test.ts` — valid signature passes; wrong signature, wrong length, missing header fail; secret never in any thrown message. FAIL.
-2. - [ ] GREEN: `signature.ts`. PASS.
-3. - [ ] RED: `packages/dispatcher/tests/webhook-route.test.ts` (supertest) — signed POST with unknown event → 200 `{ ignored: true }`; bad signature → 401 `AUTH_FAILED`, no side effects; no `WEBHOOK_SECRET` → 503. FAIL.
-4. - [ ] GREEN: `webhook.ts` + `server.ts` raw-body wiring + env in `index.ts`. PASS.
-5. - [ ] Commit: `feat(dispatcher): add signature-validated GitHub webhook route`
-6. - [ ] `pnpm test && pnpm lint` green.
+1. - [x] RED: `packages/dispatcher/tests/webhook-signature.test.ts` — valid signature passes; wrong signature, wrong length, missing header fail; secret never in any thrown message. FAIL.
+2. - [x] GREEN: `signature.ts`. PASS.
+3. - [x] RED: `packages/dispatcher/tests/webhook-route.test.ts` (supertest) — signed POST with unknown event → 200 `{ ignored: true }`; bad signature → 401 `AUTH_FAILED`, no side effects; no `WEBHOOK_SECRET` → 503. FAIL.
+4. - [x] GREEN: `webhook.ts` + `server.ts` raw-body wiring + env in `index.ts`. PASS.
+5. - [x] Commit: `feat(dispatcher): add signature-validated GitHub webhook route`
+6. - [x] `pnpm test && pnpm lint` green.
 
 ## How to Test
 

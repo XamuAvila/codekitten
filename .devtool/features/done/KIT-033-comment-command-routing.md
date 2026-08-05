@@ -46,10 +46,10 @@ See [US-029](../../docs/stories/US-029-comment-commands.md).
 
 ## Implementation Plan
 
-1. - [ ] RED: extend `webhook-events.test.ts` — `@reviewer force` → follow_up published with "force"; `@reviewer stop` → "stop"; `@reviewer why X?` → message "why X?"; no trigger → ignored; bot author → ignored; non-PR issue comment → ignored; terminal job → 200 ignored + log; `@REVIEWER force` (case) → works. FAIL.
-2. - [ ] GREEN: `issue_comment` branch + shared publish helper extracted from `routes/message.ts` (route behavior unchanged, its tests stay green). PASS.
-3. - [ ] Commit: `feat(dispatcher): route @reviewer PR comments to force/stop/follow-up`
-4. - [ ] `pnpm test && pnpm lint` green.
+1. - [x] RED: extend `webhook-events.test.ts` — `@reviewer force` → follow_up published with "force"; `@reviewer stop` → "stop"; `@reviewer why X?` → message "why X?"; no trigger → ignored; bot author → ignored; non-PR issue comment → ignored; terminal job → 200 ignored + log; `@REVIEWER force` (case) → works. FAIL.
+2. - [x] GREEN: `issue_comment` branch + shared publish helper extracted from `routes/message.ts` (route behavior unchanged, its tests stay green). PASS.
+3. - [x] Commit: `feat(dispatcher): route @reviewer PR comments to force/stop/follow-up`
+4. - [x] `pnpm test && pnpm lint` green.
 
 ## How to Test
 

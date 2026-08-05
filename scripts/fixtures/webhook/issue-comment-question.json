@@ -1,0 +1,7 @@
+{
+  "action": "created",
+  "issue": { "number": 2, "pull_request": { "url": "https://api.github.com/repos/XamuAvila/kitten-test-repo/pulls/2" } },
+  "comment": { "body": "@reviewer summarize the changes in one sentence", "user": { "login": "XamuAvila", "type": "User" } },
+  "repository": { "full_name": "XamuAvila/kitten-test-repo" },
+  "sender": { "login": "XamuAvila", "type": "User" }
+}

@@ -87,6 +87,15 @@ if [[ -n "${ANTHROPIC_API_KEY:-}" || -n "${OPENAI_API_KEY:-}" || -n "${DEEPSEEK_
   success "Secret 'kitten-llm-keys' created from environment"
 fi
 
+# ─── 5c. Webhook secret (v5) ─────────────────────────────────────────────────
+# Generated when not exported — echoed once so it can be configured on GitHub.
+WEBHOOK_SECRET="${WEBHOOK_SECRET:-$(openssl rand -hex 20)}"
+info "Creating kitten-webhook-secret..."
+${K} create secret generic kitten-webhook-secret \
+  --from-literal=secret="${WEBHOOK_SECRET}" \
+  -n kitten --dry-run=client -o yaml | ${K} apply -f -
+success "Secret 'kitten-webhook-secret' applied (value: ${WEBHOOK_SECRET})"
+
 # ─── 6. Apply Redis deployment + service ─────────────────────────────────────
 info "Applying Redis deployment and service..."
 ${K} apply -f "${PROJECT_ROOT}/k8s/redis-deployment.yaml"

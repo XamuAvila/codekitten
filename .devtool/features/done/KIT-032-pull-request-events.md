@@ -58,13 +58,13 @@ See [US-028](../../docs/stories/US-028-auto-review-on-pr-events.md) (AC-1) and [
 
 ## Implementation Plan
 
-1. - [ ] RED: `packages/dispatcher/tests/webhook-events.test.ts` — signed `pull_request opened` → `createPod` called with the right manifest + status stored (via `dispatchReview`); `synchronize` with active job → `re_review` published, no Pod; publish returning 0 → Pod created; `closed` action → ignored; malformed payload → 200 + warning. FAIL.
-2. - [ ] GREEN: `dispatch.ts` (extraction), `events.ts`, wire into `webhook.ts`; `re_review` in the shared type union. PASS (existing `POST /review` tests must stay green — extraction is behavior-preserving).
-3. - [ ] Commit: `feat(dispatcher): dispatch reviews from pull_request webhooks`
-4. - [ ] RED: `packages/reviewer/tests/agent.test.ts` — `re_review` message triggers the callback, resets idle timer; a second `re_review` during a run queues once (no concurrent pipelines). FAIL.
-5. - [ ] GREEN: `onReReview` in `agent.ts`/`index.ts` with in-flight serialization. PASS.
-6. - [ ] Commit: `feat(reviewer): re-run pipeline on re_review message`
-7. - [ ] `pnpm test && pnpm lint` green.
+1. - [x] RED: `packages/dispatcher/tests/webhook-events.test.ts` — signed `pull_request opened` → `createPod` called with the right manifest + status stored (via `dispatchReview`); `synchronize` with active job → `re_review` published, no Pod; publish returning 0 → Pod created; `closed` action → ignored; malformed payload → 200 + warning. FAIL.
+2. - [x] GREEN: `dispatch.ts` (extraction), `events.ts`, wire into `webhook.ts`; `re_review` in the shared type union. PASS (existing `POST /review` tests must stay green — extraction is behavior-preserving).
+3. - [x] Commit: `feat(dispatcher): dispatch reviews from pull_request webhooks`
+4. - [x] RED: `packages/reviewer/tests/agent.test.ts` — `re_review` message triggers the callback, resets idle timer; a second `re_review` during a run queues once (no concurrent pipelines). FAIL.
+5. - [x] GREEN: `onReReview` in `agent.ts`/`index.ts` with in-flight serialization. PASS.
+6. - [x] Commit: `feat(reviewer): re-run pipeline on re_review message`
+7. - [x] `pnpm test && pnpm lint` green.
 
 ## How to Test
 

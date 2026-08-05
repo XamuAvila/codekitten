@@ -168,6 +168,24 @@ IDLE_TIMEOUT=30 ./scripts/e2e-test.sh
 
 # Remove finished reviewer Pods
 ./scripts/cleanup-pods.sh
+
+# --- GitHub webhook (v5) ---
+# The dispatcher exposes POST /webhook/github (HMAC SHA-256 signed).
+# minikube-setup.sh seeds the kitten-webhook-secret (echoes the value once).
+#
+# Wire a real repo (needs a publicly reachable dispatcher, e.g. ngrok):
+#   Repo → Settings → Webhooks → Add webhook
+#     Payload URL:  https://<public-host>/webhook/github
+#     Content type: application/json
+#     Secret:       <the seeded WEBHOOK_SECRET>
+#     Events:       Pull requests + Issue comments
+#   PR opened/reopened/synchronized → review starts automatically.
+#   PR comment "@reviewer force|stop|<question>" → command routed to the Pod
+#   (trigger word configurable via TRIGGER_WORD env on the dispatcher;
+#   push to a PR with a live review re-runs the pipeline in the same Pod).
+#
+# Local/simulated deliveries (no tunnel needed):
+./scripts/webhook-e2e.sh
 ```
 
 **Always pass `--context=minikube` to `kubectl`.** The scripts do this internally;

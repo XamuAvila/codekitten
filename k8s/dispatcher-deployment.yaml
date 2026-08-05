@@ -35,6 +35,14 @@ spec:
                 secretKeyRef:
                   name: kitten-github-token
                   key: token
+            - name: WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: kitten-webhook-secret
+                  key: secret
+                  optional: true
+            - name: TRIGGER_WORD
+              value: "@reviewer"
           resources:
             limits:
               memory: "256Mi"
