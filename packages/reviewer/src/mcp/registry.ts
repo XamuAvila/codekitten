@@ -35,6 +35,8 @@ export interface McpRegistry {
 
 import { readFileTool } from "./read-file.js";
 import { searchTool } from "./search.js";
+import { findRelatedTool } from "./find-related.js";
+import { listDirectoryTool } from "./list-directory.js";
 
 export function createRegistry(
   cloneDir: string,
@@ -43,7 +45,9 @@ export function createRegistry(
 ): McpRegistry {
   const ctx: McpContext = { cloneDir, skipPatterns, caps };
   const tools = new Map<McpToolName, McpTool>(
-    [readFileTool, searchTool].filter((tool) => caps.tools.includes(tool.name)).map((tool) => [tool.name, tool]),
+    [readFileTool, searchTool, findRelatedTool, listDirectoryTool]
+      .filter((tool) => caps.tools.includes(tool.name))
+      .map((tool) => [tool.name, tool]),
   );
   return {
     ctx,

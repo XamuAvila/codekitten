@@ -1,6 +1,6 @@
 ---
 id: "KIT-025"
-status: "backlog"
+status: "in-progress"
 priority: "medium"
 assignee: ""
 epic: "v4-mcp-agentic-review"
