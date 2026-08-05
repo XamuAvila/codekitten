@@ -224,6 +224,48 @@ describe("runAgenticLoop", () => {
     expect(serialized).toContain("VALIDATION");
   });
 
+  it("tools whitelist: only whitelisted tools + report_findings appear in every turn (US-026 AC-5)", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kitten-loop-"));
+    fs.writeFileSync(path.join(dir, "a.ts"), "const a = 1;\n");
+    const config = { ...DEFAULT_MCP_CONFIG, tools: ["read_file"] as const };
+    const registry = createRegistry(dir, [], config);
+    const adapter = makeAdapter([
+      { toolUses: [{ name: "read_file", input: { path: "a.ts" } }] },
+      { toolUses: [{ name: "report_findings", input: { findings: [] } }] },
+    ]);
+
+    await runAgenticLoop(adapter, PROMPT, config, { registry, maxOutputTokens: 8000 });
+
+    for (const call of adapter.explore.mock.calls) {
+      const names = call[0].tools.map((tool: { name: string }) => tool.name);
+      expect(names.sort()).toEqual(["read_file", "report_findings"].sort());
+    }
+  });
+
+  it("force escalation: opts.maxTurns overrides config maxTurns (13th turn still explores)", async () => {
+    const exploring = Array.from({ length: 13 }, () => ({
+      toolUses: [{ name: "read_file", input: { path: "a.ts" } }],
+    }));
+    const adapter = makeAdapter([
+      ...exploring,
+      { toolUses: [{ name: "report_findings", input: { findings: [] } }] },
+    ]);
+
+    const result = await runAgenticLoop(
+      adapter,
+      PROMPT,
+      { ...DEFAULT_MCP_CONFIG, maxTurns: 12 },
+      { registry: makeRegistry(), maxOutputTokens: 8000, maxTurns: 60 },
+    );
+
+    expect(result.hitBudget).toBe(false);
+    // 13 exploration turns + the reporting turn all ran unforced
+    expect(adapter.explore).toHaveBeenCalledTimes(14);
+    for (const call of adapter.explore.mock.calls) {
+      expect(call[0].forcedToolChoice).toBeUndefined();
+    }
+  });
+
   it("counts executed tool calls", async () => {
     const adapter = makeAdapter([
       {

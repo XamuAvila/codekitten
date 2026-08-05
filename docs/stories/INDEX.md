@@ -31,4 +31,4 @@
 | US-023 | Agentic Review Opt-In | done | v4-mcp-agentic-review |
 | US-024 | Repository-Wide Search During Agentic Review | done | v4-mcp-agentic-review |
 | US-025 | Related-Code Discovery During Agentic Review | done | v4-mcp-agentic-review |
-| US-026 | Agentic Cost Control | draft | v4-mcp-agentic-review |
+| US-026 | Agentic Cost Control | done | v4-mcp-agentic-review |

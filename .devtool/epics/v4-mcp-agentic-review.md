@@ -1,7 +1,7 @@
 ---
 id: v4-mcp-agentic-review
 title: "v4: MCP Agentic Review"
-status: active
+status: done
 created: "2026-08-05"
 ---
 

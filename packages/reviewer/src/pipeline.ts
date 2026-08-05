@@ -297,7 +297,9 @@ export async function runPipeline(
         tokenEstimate: result.metadata.inputTokens + result.metadata.outputTokens,
         model: result.metadata.model,
         diff: { insertions: diff.insertions, deletions: diff.deletions },
-        findingsBody: budgetQuestionComment(budget),
+        findingsBody: agenticHitBudget
+          ? agenticBudgetComment(agenticToolCalls ?? 0)
+          : budgetQuestionComment(budget),
       });
     }
 
@@ -373,6 +375,17 @@ function budgetQuestionComment(budget: number): string {
       `The review covered a subset of the changed files.`,
     ``,
     `Reply \`force\` to review the full PR without limits.`,
+  ].join("\n");
+}
+
+function agenticBudgetComment(toolCalls: number): string {
+  return [
+    `🐱 **Kitten** [KITTEN-TEST]`,
+    ``,
+    `The agentic review hit its turn budget after ${toolCalls} tool call${toolCalls === 1 ? "" : "s"} — ` +
+      `findings above may be incomplete.`,
+    ``,
+    `Reply \`force\` to re-run with a raised budget.`,
   ].join("\n");
 }
 

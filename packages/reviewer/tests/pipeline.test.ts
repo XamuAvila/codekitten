@@ -669,6 +669,44 @@ describe("runPipeline", () => {
       expect(result.findings).toHaveLength(1);
     });
 
+    it("budget-exhausted agentic review posts the force invitation with the tool-call count (US-026)", async () => {
+      enableAgenticFs(JSON.stringify({ enabled: true, maxTurns: 1 }));
+      // Turn 1 explores (consumes the only turn); finalize turn reports.
+      const mockExplore = vi
+        .fn()
+        .mockResolvedValueOnce({
+          toolUses: [{ name: "read_file", input: { path: "src/app.ts" } }],
+          metadata: { inputTokens: 10, outputTokens: 5, durationMs: 1 },
+        })
+        .mockResolvedValueOnce({
+          toolUses: [{ name: "report_findings", input: { findings: [FINDING] } }],
+          metadata: { inputTokens: 10, outputTokens: 5, durationMs: 1 },
+        });
+      mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });
+
+      const result = await runPipeline(baseConfig);
+
+      expect(result.status).toBe("completed");
+      expect(result.metadata.toolCalls).toBe(1);
+      const bodies = mockCreateComment.mock.calls.map((c) => (c[0] as { body: string }).body);
+      expect(bodies.some((b) => /force/i.test(b))).toBe(true);
+      expect(bodies.some((b) => /1 tool call/i.test(b))).toBe(true);
+    });
+
+    it("agentic review that reports before the budget posts no budget comment", async () => {
+      enableAgenticFs(JSON.stringify({ enabled: true }));
+      const mockExplore = vi.fn().mockResolvedValue({
+        toolUses: [{ name: "report_findings", input: { findings: [FINDING] } }],
+        metadata: { inputTokens: 10, outputTokens: 5, durationMs: 1 },
+      });
+      mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });
+
+      await runPipeline(baseConfig);
+
+      const bodies = mockCreateComment.mock.calls.map((c) => (c[0] as { body: string }).body);
+      expect(bodies.some((b) => /force/i.test(b))).toBe(false);
+    });
+
     it("no file → v3 path, no agentic call", async () => {
       const mockExplore = vi.fn();
       mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });
