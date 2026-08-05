@@ -266,6 +266,39 @@ describe("runAgenticLoop", () => {
     }
   });
 
+  it("retries a transient explore failure and completes (US-027 AC-2)", async () => {
+    const transient = Object.assign(new Error("rate limited"), { status: 429 });
+    const adapter = makeAdapter([]);
+    adapter.explore
+      .mockRejectedValueOnce(transient)
+      .mockResolvedValueOnce({
+        toolUses: [{ name: "report_findings", input: { findings: [] } }],
+        metadata: { inputTokens: 1, outputTokens: 1, durationMs: 1 },
+      });
+
+    const result = await runAgenticLoop(adapter, PROMPT, DEFAULT_MCP_CONFIG, {
+      registry: makeRegistry(),
+      maxOutputTokens: 8000,
+    });
+
+    expect(result.findings).toEqual([]);
+    expect(adapter.explore).toHaveBeenCalledTimes(2);
+  }, 15_000);
+
+  it("never retries a 401 auth failure", async () => {
+    const auth = Object.assign(new Error("unauthorized"), { status: 401 });
+    const adapter = makeAdapter([]);
+    adapter.explore.mockRejectedValue(auth);
+
+    await expect(
+      runAgenticLoop(adapter, PROMPT, DEFAULT_MCP_CONFIG, {
+        registry: makeRegistry(),
+        maxOutputTokens: 8000,
+      }),
+    ).rejects.toThrow("unauthorized");
+    expect(adapter.explore).toHaveBeenCalledTimes(1);
+  });
+
   it("counts executed tool calls", async () => {
     const adapter = makeAdapter([
       {

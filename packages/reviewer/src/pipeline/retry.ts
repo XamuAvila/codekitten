@@ -16,11 +16,15 @@ export interface RetryOptions {
 const DEFAULT_ATTEMPTS = 3;
 const DEFAULT_BACKOFF = [1_000, 2_000, 4_000];
 
-function isAuthError(error: unknown): boolean {
+/**
+ * Auth failures cannot heal by waiting — never retried. Covers both the
+ * SDK `isAuth` flag and a bare HTTP 401 status. Shared by the chunk path
+ * (pipeline.ts) and the agentic loop (agentic/loop.ts).
+ */
+export function isAuthError(error: unknown): boolean {
   return (
     error instanceof Error &&
-    "isAuth" in error &&
-    (error as { isAuth: unknown }).isAuth === true
+    ("isAuth" in error || (error as { status?: unknown }).status === 401)
   );
 }
 

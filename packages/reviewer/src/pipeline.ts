@@ -7,7 +7,7 @@ import { generateDiff } from "./git/diff.js";
 import { fetchPrFiles } from "./git/files.js";
 import { readChangedFiles } from "./git/read-files.js";
 import { buildReviewPrompt } from "./prompt/build-prompt.js";
-import { callWithRetry } from "./pipeline/retry.js";
+import { callWithRetry, isAuthError } from "./pipeline/retry.js";
 import { splitFilesIntoChunks, consolidateFindings, estimateTokens } from "./chunker/index.js";
 import { postReviewComment } from "./github/comment.js";
 import { postPrReview } from "./github/review.js";
@@ -350,13 +350,6 @@ export async function runPipeline(
     // Cleanup even on failure — invariant: clone dirs are always cleaned up
     cleanup(cloneDir);
   }
-}
-
-function isAuthError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    ("isAuth" in error || (error as { status?: unknown }).status === 401)
-  );
 }
 
 function noIssuesComment(): string {

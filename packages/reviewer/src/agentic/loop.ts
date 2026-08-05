@@ -2,6 +2,7 @@ import { AppError, FindingSchema } from "@kitten/shared";
 import type { AgentTool, ChatMessage, Finding, LLMAdapter, MCPConfig } from "@kitten/shared";
 
 import type { BuiltPrompt } from "../prompt/build-prompt.js";
+import { callWithRetry, isAuthError } from "../pipeline/retry.js";
 import { toolError } from "../mcp/registry.js";
 import type { McpRegistry } from "../mcp/registry.js";
 
@@ -54,13 +55,19 @@ export async function runAgenticLoop(
     }
 
     const isFinalize = turn === maxTurns || textOnlyStreak >= 2;
-    const result = await adapter.explore({
-      system: prompt.system,
-      messages,
-      tools,
-      maxOutputTokens: opts.maxOutputTokens,
-      ...(isFinalize ? { forcedToolChoice: { name: REPORT_TOOL } } : {}),
-    });
+    // Transient failures (timeout, 5xx, 429) retry with the v3 backoff;
+    // auth failures never do (US-027 AC-2).
+    const result = await callWithRetry(
+      () =>
+        adapter.explore({
+          system: prompt.system,
+          messages,
+          tools,
+          maxOutputTokens: opts.maxOutputTokens,
+          ...(isFinalize ? { forcedToolChoice: { name: REPORT_TOOL } } : {}),
+        }),
+      { isRetryable: (error) => !isAuthError(error) },
+    );
 
     const report = result.toolUses.find((use) => use.name === REPORT_TOOL);
     if (report) {

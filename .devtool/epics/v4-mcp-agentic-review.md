@@ -1,7 +1,7 @@
 ---
 id: v4-mcp-agentic-review
 title: "v4: MCP Agentic Review"
-status: done
+status: active
 created: "2026-08-05"
 ---
 
@@ -72,6 +72,10 @@ Execution order (sequential — each depends on the previous):
 | [KIT-024](../features/KIT-024-repo-search-tool.md) | [US-024](../../docs/stories/US-024-repo-search-tool.md) | `search` tool in the loop (regex, skip patterns, caps, truncation) |
 | [KIT-025](../features/KIT-025-related-code-tools.md) | [US-025](../../docs/stories/US-025-related-code-tools.md) | `find_related` (identifier extraction → repo-wide occurrences) + `list_directory` |
 | [KIT-026](../features/KIT-026-agentic-cost-control.md) | [US-026](../../docs/stories/US-026-agentic-cost-control.md) | per-tool caps + `tools` whitelist enforcement, `force` escalation, budget-exceeded UX, tool-call metadata |
+| [KIT-027](../features/KIT-027-agentic-context-guard.md) | [US-027](../../docs/stories/US-027-agentic-review-hardening.md) | `maxContextTokens` guard on the agentic prompt (diff truncation + force invitation) |
+| [KIT-028](../features/KIT-028-agentic-turn-retry.md) | [US-027](../../docs/stories/US-027-agentic-review-hardening.md) | `callWithRetry` around explore turns (transient errors retried, 401 never) |
+| [KIT-029](../features/KIT-029-agentic-stop-semantics.md) | [US-027](../../docs/stories/US-027-agentic-review-hardening.md) | aborted loop → pipeline posts nothing (cancelled UX stays in stop plumbing) |
+| [KIT-030](../features/KIT-030-agentic-cost-transparency.md) | [US-027](../../docs/stories/US-027-agentic-review-hardening.md) | real token accounting + per-turn tool logging |
 
 Step-by-step TDD implementation plans live in each card's
 `## Implementation Plan` section.
