@@ -5,9 +5,11 @@ import fs from "node:fs";
 import type { CloneResult } from "../types.js";
 
 /**
- * Clones a repository with --depth=1 using token-authenticated HTTPS.
- * Auth URL format: https://x-access-token:{token}@github.com/{repo}.git
- * Token is NEVER logged — all error paths sanitize the URL.
+ * Full clone (all refs — v2 decision, git_log/diff need history) with the PR
+ * head branch checked out (KIT-041: everything read from the worktree —
+ * .reviewer.yml, .reviewer-mcp.json, conventions, agentic tools — must see
+ * the head, not the default branch). Token-authenticated HTTPS; the token is
+ * NEVER logged — all error paths sanitize the URL.
  * Throws AppError(NOT_FOUND) when the clone fails.
  */
 export async function cloneRepo(
@@ -21,7 +23,7 @@ export async function cloneRepo(
 
   try {
     const git = simpleGit();
-    await git.clone(authUrl, destDir);
+    await git.clone(authUrl, destDir, ["--branch", branch]);
   } catch (error: unknown) {
     const rawMessage = error instanceof Error ? error.message : String(error);
     // Sanitize: replace any occurrence of the token in the error message

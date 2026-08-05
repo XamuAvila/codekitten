@@ -83,8 +83,8 @@ Reviewer Pod (v7)
  ├─ container: reviewer (node)      — pipeline + agentic loop
  │    tools: read_file, search, find_related, list_directory   (v4)
  │           git_log, git_blame                                 (KIT-035)
- │           semantic_search ──MCP──▶ sidecar                   (KIT-036)
- └─ container: semble (python/uv)   — Semble over /workspace clone
+ │           semantic_search ──HTTP──▶ sidecar shim ──MCP/stdio──▶ semble  (KIT-036)
+ └─ container: semble (python/uv)   — HTTP shim + Semble over /workspace clone
       index: PVC /semble-index/{repo}/{baseRef}                 (cross-run)
 
 Dispatcher (v7)
@@ -100,8 +100,8 @@ Pipeline start (both paths)
 
 | Component | Technology | Verify before use |
 |---|---|---|
-| Semantic code index | Semble (Python, via `uv`) sidecar, MCP protocol | Semble CLI/MCP interface + index persistence flags — check current docs at implementation (Context7/repo) |
-| Embeddings (knowledge) | Voyage AI code embedding model via REST | model name + dims — check current Voyage docs (Context7) |
+| Semantic code index | Semble 0.5.3 (Python, via `uv`) sidecar; stdio-only MCP bridged by an HTTP shim (`docker/semble-sidecar/server.py`) | verified 2026-08-05 — findings in KIT-036 |
+| Embeddings (knowledge) | Voyage `voyage-code-3` (1024 dims) via REST; `VOYAGE_BASE_URL=https://ai.mongodb.com` for Atlas-provisioned keys | verified 2026-08-05 — findings in KIT-037 |
 | Vector store | MongoDB Atlas Vector Search, official node driver | index definition syntax — check current Atlas docs (Context7) |
 | Secrets | `MONGODB_URI`, `VOYAGE_API_KEY` (cluster secrets, optional) | — |
 | Index persistence | K8s PVC mounted in both containers | — |

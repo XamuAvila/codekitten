@@ -22,18 +22,18 @@ describe("cloneRepo", () => {
     expect(mockGit.clone).toHaveBeenCalledWith(
       "https://x-access-token:test-token-123@github.com/owner/repo.git",
       "/tmp/test-clone",
+      ["--branch", "main"],
     );
   });
 
-  it("passes clone options without depth restriction", async () => {
+  it("checks out the requested head branch (KIT-041) with no depth restriction", async () => {
     mockGit.clone.mockResolvedValueOnce(undefined);
 
     await cloneRepo("owner/repo", "feat/x", "/tmp/test-clone", "tok");
 
-    expect(mockGit.clone).toHaveBeenCalledWith(
-      expect.any(String),
-      "/tmp/test-clone",
-    );
+    const [, , options] = mockGit.clone.mock.calls[0];
+    expect(options).toEqual(["--branch", "feat/x"]);
+    expect(options.join(" ")).not.toContain("--depth");
   });
 
   it("wraps git errors in AppError NOT_FOUND", async () => {

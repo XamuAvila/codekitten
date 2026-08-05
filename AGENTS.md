@@ -133,7 +133,7 @@ pnpm test
 # Lint
 pnpm lint
 
-# --- Option A: dispatcher + Redis only (no K8s) ---
+# --- Option A: dispatcher + Redis + local Mongo (no K8s) ---
 # Fast loop for routes/validation/health. Reviews are NOT runnable here:
 # POST /review returns 503 because there is no Kubernetes API to create Pods.
 docker compose up -d --build
@@ -151,6 +151,14 @@ docker compose down
 GITHUB_TOKEN=<token> ANTHROPIC_API_KEY=<key> DEEPSEEK_API_KEY=<key> \
 MONGODB_URI=<atlas-uri> VOYAGE_API_KEY=<key> \
   ./scripts/minikube-setup.sh
+# Notes on the knowledge secrets:
+#   - No Atlas cluster? docker compose up -d mongo starts a local
+#     mongodb-atlas-local (vector search capable) on port 27021:
+#     MONGODB_URI="mongodb://localhost:27021/?directConnection=true"
+#     (minikube-setup rewrites localhost → host.minikube.internal for Pods).
+#   - Voyage keys provisioned through MongoDB Atlas only work against
+#     https://ai.mongodb.com — export VOYAGE_BASE_URL=https://ai.mongodb.com
+#     for those; keys from voyageai.com need no override.
 
 DISPATCHER_URL=$(minikube service kitten-dispatcher -n kitten --url)
 

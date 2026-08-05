@@ -70,13 +70,15 @@ wait_for() { # condition-cmd description
 status_of() { curl -s "${DISPATCHER_URL}/status/${JOB_ID}" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4; }
 
 mongo_count() { # count knowledge docs for the test repo
-  MONGODB_URI="$MONGODB_URI" node -e '
+  # cd packages/shared: mongodb is a dependency of @kitten/shared (pnpm strict)
+  cd "${SCRIPT_DIR}/../packages/shared" && MONGODB_URI="$MONGODB_URI" node -e '
     import("mongodb").then(async ({ MongoClient }) => {
       const c = await MongoClient.connect(process.env.MONGODB_URI);
       const n = await c.db("kitten").collection("knowledge")
         .countDocuments({ repo: "XamuAvila/kitten-test-repo" });
       console.log(n); await c.close();
     });'
+  cd - >/dev/null
 }
 
 # --- 0. Clean slate ---
