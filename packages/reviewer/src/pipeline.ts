@@ -128,20 +128,32 @@ export async function runPipeline(
         mcpConfig,
       );
       const maxTurns = opts?.ignoreBudget ? mcpConfig.forceMaxTurns : mcpConfig.maxTurns;
-      const agenticPrompt = buildAgenticPrompt(
-        diff.raw,
-        prFiles.map((file) => ({
-          path: file.filename,
-          status: file.status,
-          additions: file.additions,
-          deletions: file.deletions,
-          patchBytes: file.patch !== undefined ? Buffer.byteLength(file.patch, "utf-8") : 0,
-        })),
-        reviewerConfig.config,
-        conventions,
-        mcpConfig,
-        maxTurns,
-      );
+      const changedFileIndex = prFiles.map((file) => ({
+        path: file.filename,
+        status: file.status,
+        additions: file.additions,
+        deletions: file.deletions,
+        patchBytes: file.patch !== undefined ? Buffer.byteLength(file.patch, "utf-8") : 0,
+      }));
+      const resolvedConfig = reviewerConfig.config;
+      const buildPrompt = (diffRaw: string) =>
+        buildAgenticPrompt(diffRaw, changedFileIndex, resolvedConfig, conventions, mcpConfig, maxTurns);
+
+      // maxContextTokens guards the initial prompt (US-027 AC-1). Oversized
+      // diff → truncate to fit; the model recovers missing context via the
+      // tools. `force` (ignoreBudget) sends the full diff.
+      let agenticDiff = diff.raw;
+      let agenticPrompt = buildPrompt(agenticDiff);
+      if (!opts?.ignoreBudget && estimateTokens(agenticPrompt.user) > budget) {
+        while (estimateTokens(agenticPrompt.user) > budget && agenticDiff.length > 512) {
+          agenticDiff = agenticDiff.slice(0, Math.floor(agenticDiff.length / 2));
+          agenticPrompt = buildPrompt(`${agenticDiff}\n[diff truncated]`);
+        }
+        console.warn(
+          `[reviewer] Agentic prompt over maxContextTokens (${budget}) — diff truncated to ${agenticDiff.length} chars`,
+        );
+        agenticHitBudget = true; // posts the force invitation below
+      }
       try {
         const loop = await runAgenticLoop(adapter, agenticPrompt, mcpConfig, {
           registry,
@@ -150,7 +162,7 @@ export async function runPipeline(
           ...(opts?.signal ? { signal: opts.signal } : {}),
         });
         agenticToolCalls = loop.toolCalls;
-        agenticHitBudget = loop.hitBudget;
+        agenticHitBudget = agenticHitBudget || loop.hitBudget;
         console.log(`[reviewer] Agentic loop done: ${loop.toolCalls} tool calls, hitBudget=${loop.hitBudget}${loop.aborted ? ", aborted" : ""}`);
         if (loop.aborted) {
           // Stop command: post NOTHING — cancellation status and the

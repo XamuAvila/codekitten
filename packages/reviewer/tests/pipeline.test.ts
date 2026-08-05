@@ -722,6 +722,38 @@ describe("runPipeline", () => {
       expect(mockCreateComment).not.toHaveBeenCalled();
     });
 
+    it("oversized diff is truncated to fit maxContextTokens and invites force (US-027 AC-1)", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      // Tiny budget via .reviewer.yml + huge diff
+      mockExistsSync.mockImplementation((path: unknown) => {
+        if (typeof path === "string" && path.endsWith(".reviewer-mcp.json")) return true;
+        if (typeof path === "string" && path.endsWith(".reviewer.yml")) return true;
+        return false;
+      });
+      mockReadFileSync.mockImplementation((path: string) => {
+        if (path.endsWith(".reviewer-mcp.json")) return JSON.stringify({ enabled: true });
+        if (path.endsWith(".reviewer.yml")) return "reviewer:\n  max_context_tokens: 50\n";
+        return "";
+      });
+      mockGitDiff.mockResolvedValue(`diff --git a/x b/x\n${"+ padding line\n".repeat(500)}`);
+
+      const mockExplore = vi.fn().mockResolvedValue({
+        toolUses: [{ name: "report_findings", input: { findings: [] } }],
+        metadata: { inputTokens: 10, outputTokens: 5, durationMs: 1 },
+      });
+      mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });
+
+      const result = await runPipeline(baseConfig);
+
+      expect(result.status).toBe("completed");
+      const sentUser = mockExplore.mock.calls[0][0].messages[0].content as string;
+      expect(sentUser).toContain("[diff truncated]");
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("truncat"));
+      const bodies = mockCreateComment.mock.calls.map((c) => (c[0] as { body: string }).body);
+      expect(bodies.some((b) => /force/i.test(b))).toBe(true);
+      warn.mockRestore();
+    });
+
     it("no file → v3 path, no agentic call", async () => {
       const mockExplore = vi.fn();
       mockCreateLlmAdapter.mockReturnValue({ review: mockReview, respond: vi.fn(), explore: mockExplore });
