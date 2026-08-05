@@ -1,0 +1,15 @@
+# v10 — shared-cluster overlay: dispatcher Service becomes ClusterIP.
+#
+# On a cluster Kitten does not own the Service must not publish a NodePort —
+# the node groups sit in private subnets and traffic arrives through the
+# cluster's own ingress. The base keeps `NodePort` because `minikube service`
+# (README quickstart, AGENTS.md, the three E2E scripts) requires it (epic D5).
+# Targeted by name: the `redis` Service, already ClusterIP in the base
+# (k8s/redis-service.yaml), is left untouched.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kitten-dispatcher
+  namespace: kitten
+spec:
+  type: ClusterIP

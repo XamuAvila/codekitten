@@ -1,0 +1,29 @@
+# Shared-cluster overlay (v10) — Kitten as a tenant of a cluster it does not own.
+#
+# A SIBLING of k8s/, deliberately NOT k8s/overlays/shared-cluster: a nested
+# overlay fails with `cycle detected: candidate root '.../k8s' contains
+# visited root '.../k8s/overlays/shared-cluster'` (epic D9, verified with
+# kustomize v5.8.1).
+#
+# What it changes over the base (k8s/):
+#   1. The dispatcher Service becomes ClusterIP — reachable only through the
+#      cluster's own ingress, the way a tenant Service should be.
+#   2. The Semble index PVC pins a storageClassName the operator provides —
+#      where no default StorageClass exists the PVC would stay Pending and the
+#      reviewer Pod would never schedule at all.
+#   3. An Ingress template routes the dispatcher through the cluster's ingress
+#      controller. The host, ingress class and TLS secret are REPLACE_ME
+#      placeholders — the operator must supply them (epic D7, US-042 AC-4).
+#
+# The base is never modified; `kubectl apply -k k8s` keeps serving the
+# minikube quickstart and the dedicated-cluster v9 path.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../k8s
+  - ingress.yaml
+
+patches:
+  - path: service-clusterip-patch.yaml
+  - path: pvc-storageclass-patch.yaml

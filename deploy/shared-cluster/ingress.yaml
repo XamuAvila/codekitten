@@ -1,0 +1,37 @@
+# v10 — shared-cluster overlay: Ingress template (epic D7, US-042 AC-4).
+#
+# This is a TEMPLATE, not a configured resource. Every REPLACE_ME value below
+# belongs to whoever owns the target cluster: the hostname, the ingress class
+# and the TLS certificate. DNS records and certificate provisioning are the
+# operator's to arrange — this repository ships no hostname, no cert, and no
+# domain (epic out-of-scope).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kitten-dispatcher
+  namespace: kitten
+  labels:
+    app: kitten-dispatcher
+  # Optional: annotations your ingress controller expects, e.g.
+  # annotations:
+  #   cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  # REPLACE_ME — the IngressClass your cluster's controller is named (e.g.
+  # nginx, traefik, alb). Delete this block to use the cluster's default class.
+  ingressClassName: REPLACE_ME
+  rules:
+    - host: REPLACE_ME
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kitten-dispatcher
+                port:
+                  number: 3001
+  tls:
+    # REPLACE_ME — the Secret holding your certificate for the host above.
+    - hosts:
+        - REPLACE_ME
+      secretName: REPLACE_ME

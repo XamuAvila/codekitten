@@ -1,0 +1,20 @@
+# v10 — shared-cluster overlay: pin the Semble index PVC's StorageClass.
+#
+# The base declares no storageClassName because any value would be wrong on
+# some cluster (epic D6). Where no default StorageClass is marked, the PVC
+# stays Pending — and since the reviewer Pod mounts it, the Pod never
+# schedules at all. A hard failure, invisible until someone reads the PVC
+# events.
+#
+# REPLACE_ME — the StorageClass your cluster names (e.g. gp3-csi, standard).
+# The operator must replace it before applying on a fresh cluster. On a
+# cluster where `kitten-semble-index` already exists, changing
+# spec.storageClassName is rejected (immutable on a bound PVC) — delete the
+# PVC first; the index is derived data and Semble rebuilds it incrementally.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kitten-semble-index
+  namespace: kitten
+spec:
+  storageClassName: REPLACE_ME
