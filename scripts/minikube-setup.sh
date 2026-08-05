@@ -96,6 +96,32 @@ ${K} create secret generic kitten-webhook-secret \
   -n kitten --dry-run=client -o yaml | ${K} apply -f -
 success "Secret 'kitten-webhook-secret' applied (value: ${WEBHOOK_SECRET})"
 
+# ─── 5d. Knowledge secrets + Atlas index bootstrap (v7) ──────────────────────
+# Optional: without MONGODB_URI/VOYAGE_API_KEY the knowledge pillars stay off
+# (warning at boot) and reviews are unaffected.
+if [[ -n "${MONGODB_URI:-}" && -n "${VOYAGE_API_KEY:-}" ]]; then
+  info "Creating kitten-knowledge-secrets from environment..."
+  ${K} create secret generic kitten-knowledge-secrets \
+    --from-literal=MONGODB_URI="${MONGODB_URI}" \
+    --from-literal=VOYAGE_API_KEY="${VOYAGE_API_KEY}" \
+    -n kitten --dry-run=client -o yaml | ${K} apply -f -
+  success "Secret 'kitten-knowledge-secrets' created"
+
+  info "Bootstrapping Atlas vector index (idempotent)..."
+  if MONGODB_URI="${MONGODB_URI}" node "${PROJECT_ROOT}/scripts/atlas-bootstrap.mjs"; then
+    success "Atlas knowledge_vector_index ready"
+  else
+    warn "Atlas index bootstrap failed — knowledge search will return empty until the index exists"
+  fi
+else
+  warn "MONGODB_URI/VOYAGE_API_KEY not exported — knowledge store disabled (remember/corrections/few-shot off)"
+fi
+
+# ─── 5e. Semble index PVC (v7) ───────────────────────────────────────────────
+info "Applying Semble index PVC..."
+${K} apply -f "${PROJECT_ROOT}/k8s/semble-index-pvc.yaml"
+success "PVC 'kitten-semble-index' applied"
+
 # ─── 6. Apply Redis deployment + service ─────────────────────────────────────
 info "Applying Redis deployment and service..."
 ${K} apply -f "${PROJECT_ROOT}/k8s/redis-deployment.yaml"
@@ -112,6 +138,10 @@ success "Dispatcher image built"
 info "Building reviewer image inside minikube..."
 minikube image build -t kitten-reviewer:latest -f "${PROJECT_ROOT}/packages/reviewer/Dockerfile" "${PROJECT_ROOT}"
 success "Reviewer image built"
+
+info "Building semble sidecar image inside minikube..."
+minikube image build -t kitten-semble-sidecar:latest -f "${PROJECT_ROOT}/docker/semble-sidecar/Dockerfile" "${PROJECT_ROOT}/docker/semble-sidecar"
+success "Semble sidecar image built"
 
 # ─── 8. Apply dispatcher deployment + service ───────────────────────────────
 info "Applying dispatcher deployment and service..."

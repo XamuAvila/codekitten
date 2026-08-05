@@ -16,7 +16,12 @@ Full design and locked decisions live in `.devtool/epics/` — read the **latest
 2. **Clone dirs are always cleaned up** — even on error/crash. No leaked disk.
 3. **Structured errors everywhere** — `{ code, message, details }`, never bare strings.
 4. **No secrets in logs** — tokens, API keys, webhook secrets never logged.
-5. **Job isolation** — each review job is independent; no shared state between jobs.
+5. **Job isolation** — each review job is independent. Filesystem/clone
+   isolation is absolute. Cross-job state is allowed ONLY in the two
+   designated stores (v7 amendment): the Semble index PVC
+   (`kitten-semble-index` — derived data, rebuildable from the repo) and the
+   Atlas `knowledge` collection (curated data). Nothing else may persist
+   across jobs.
 
 ## Stack and code conventions
 
@@ -139,7 +144,12 @@ docker compose down
 # --- Option B: full stack on minikube (required to actually run a review) ---
 # Prerequisite: minikube >= 1.30. Seeds the GitHub token and LLM keys Secrets
 # from the exported env vars. Without LLM keys the review fails at the LLM step.
+# MONGODB_URI + VOYAGE_API_KEY are OPTIONAL (v7 knowledge store): when exported
+# they seed kitten-knowledge-secrets and bootstrap the Atlas vector index;
+# when absent, remember/corrections/few-shot stay off with a warning and
+# reviews are unaffected.
 GITHUB_TOKEN=<token> ANTHROPIC_API_KEY=<key> DEEPSEEK_API_KEY=<key> \
+MONGODB_URI=<atlas-uri> VOYAGE_API_KEY=<key> \
   ./scripts/minikube-setup.sh
 
 DISPATCHER_URL=$(minikube service kitten-dispatcher -n kitten --url)
@@ -178,7 +188,7 @@ IDLE_TIMEOUT=30 ./scripts/e2e-test.sh
 #     Payload URL:  https://<public-host>/webhook/github
 #     Content type: application/json
 #     Secret:       <the seeded WEBHOOK_SECRET>
-#     Events:       Pull requests + Issue comments
+#     Events:       Pull requests + Issue comments + Pull request review comments
 #   PR opened/reopened/synchronized → review starts automatically.
 #   PR comment "@reviewer force|stop|<question>" → command routed to the Pod
 #   (trigger word configurable via TRIGGER_WORD env on the dispatcher;
@@ -186,6 +196,26 @@ IDLE_TIMEOUT=30 ./scripts/e2e-test.sh
 #
 # Local/simulated deliveries (no tunnel needed):
 ./scripts/webhook-e2e.sh
+
+# --- Deep context (v7) ---
+# The agentic reviewer carries git history tools (git_log, git_blame), a
+# Semble sidecar for semantic code search (semantic_search tool; index
+# persists on the kitten-semble-index PVC keyed by repo+base branch, falls
+# back to the lexical search/find_related when the sidecar is absent), and a
+# per-repo knowledge base (MongoDB Atlas Vector Search + Voyage voyage-code-3
+# embeddings — knowledge text only, code embeddings are Semble-only):
+#
+#   @reviewer remember <text>   PR comment → fact stored for the repo
+#   (human reply on a reviewer finding thread → stored as a correction)
+#
+# At review start, the top-K entries (`knowledge_top_k` in .reviewer.yml,
+# default 5) most similar to the diff are injected as a "Repository
+# knowledge" prompt block in BOTH review paths. Deep context NEVER fails a
+# review: missing secrets/sidecar/Atlas degrade with a warning.
+
+# Full deep-context lifecycle check (needs MONGODB_URI + VOYAGE_API_KEY;
+# skips loudly without them):
+./scripts/deep-context-e2e.sh
 ```
 
 **Always pass `--context=minikube` to `kubectl`.** The scripts do this internally;

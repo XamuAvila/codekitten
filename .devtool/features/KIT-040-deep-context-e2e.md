@@ -1,6 +1,6 @@
 ---
 id: "KIT-040"
-status: "backlog"
+status: "in-progress"
 priority: "medium"
 assignee: ""
 epic: "v7-deep-context"
@@ -33,9 +33,9 @@ See [US-034](../../docs/stories/US-034-knowledge-calibrated-reviews.md) (AC-3) �
 
 ## Implementation Plan
 
-1. - [ ] `deep-context-e2e.sh` + setup seeding + Atlas index bootstrap.
-2. - [ ] Run on minikube with real secrets — all four assertions pass.
-3. - [ ] AGENTS.md: invariant amendment + setup + feature docs.
+1. - [x] `deep-context-e2e.sh` + setup seeding + Atlas index bootstrap.
+2. - [ ] Run on minikube with real secrets — all four assertions pass. **BLOCKED: MONGODB_URI + VOYAGE_API_KEY absent from .env (2026-08-05). Negative path verified: script skips loudly, exit 0.**
+3. - [x] AGENTS.md: invariant amendment + setup + feature docs.
 4. - [ ] Docs-alignment sweep; fix divergences in the same commit.
 5. - [ ] Commit: `feat: deep-context e2e, docs, and job-isolation amendment`
 6. - [ ] `pnpm test && pnpm lint` green; epic → done.
