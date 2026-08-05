@@ -150,13 +150,13 @@ must say, so it is settled before any file is written.
    Command: `kubectl --context=minikube apply --dry-run=client -k deploy/shared-cluster`.
    Expected: every resource reports `configured` or `created (dry run)`, no error.
 6. - [x] Commit: `feat: shared-cluster kustomize overlay`
-7. - [ ] Parameterize the deploy workflow: add
+7. - [x] Parameterize the deploy workflow: add
    `KUSTOMIZE_PATH: ${{ vars.KUSTOMIZE_PATH || 'k8s' }}` to the job `env` and
    change line 78 to `kubectl apply -k "${KUSTOMIZE_PATH}"`.
    Command: `python3 -c "import yaml;yaml.safe_load(open('.github/workflows/deploy.yml'));print('valid')"`.
    Expected: prints `valid`, and `grep -n 'apply -k' .github/workflows/deploy.yml`
    shows the variable, not a literal `k8s`.
-8. - [ ] Commit: `feat(ci): make the deploy kustomize path configurable`
+8. - [x] Commit: `feat(ci): make the deploy kustomize path configurable`
 9. - [ ] `docs/configuration.md`: add `REVIEWER_POD_SCHEDULING` to the
    dispatcher table, a scheduling subsection carrying the
    ServiceAccount-must-exist caveat, and `KUSTOMIZE_PATH` to the deployment

@@ -1,0 +1,88 @@
+name: Deploy to EKS
+
+# v9 — automatic EKS deploys. One-time bootstrap: scripts/eks-setup.sh.
+# Repo settings needed: Secret AWS_ROLE_ARN; Variables AWS_REGION, EKS_CLUSTER.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Build and Deploy to EKS
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      EKS_CLUSTER: ${{ vars.EKS_CLUSTER }}
+      # Manifests to apply on deploy. Defaults to the dedicated-cluster base;
+      # shared-cluster operators set this to `deploy/shared-cluster`, or every
+      # push reverts the overlay (epic v10 D11).
+      KUSTOMIZE_PATH: ${{ vars.KUSTOMIZE_PATH || 'k8s' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # `version` is required: pnpm/action-setup only infers it from a
+      # `packageManager` field in package.json, which this workspace does not
+      # declare. Must stay in sync with .github/workflows/ci.yml.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install and build
+        # The reviewer Dockerfile copies pre-built packages/*/dist (gitignored),
+        # so the workspace must be compiled before the image builds run.
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push images
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker build -f packages/dispatcher/Dockerfile -t "$REGISTRY/kitten-dispatcher:$IMAGE_TAG" .
+          docker build -f packages/reviewer/Dockerfile -t "$REGISTRY/kitten-reviewer:$IMAGE_TAG" .
+          docker build -f docker/semble-sidecar/Dockerfile -t "$REGISTRY/kitten-semble-sidecar:$IMAGE_TAG" docker/semble-sidecar
+          docker push "$REGISTRY/kitten-dispatcher:$IMAGE_TAG"
+          docker push "$REGISTRY/kitten-reviewer:$IMAGE_TAG"
+          docker push "$REGISTRY/kitten-semble-sidecar:$IMAGE_TAG"
+
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION"
+
+      - name: Apply manifests and roll out dispatcher
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # secret.yaml is deliberately not part of k8s/kustomization.yaml —
+          # the CI must never overwrite the live Secrets with the placeholder.
+          kubectl apply -k "${KUSTOMIZE_PATH}"
+          kubectl -n kitten set image deployment/kitten-dispatcher \
+            dispatcher="$REGISTRY/kitten-dispatcher:$IMAGE_TAG"
+          kubectl -n kitten set env deployment/kitten-dispatcher \
+            REVIEWER_IMAGE="$REGISTRY/kitten-reviewer:$IMAGE_TAG" \
+            SEMBLE_IMAGE="$REGISTRY/kitten-semble-sidecar:$IMAGE_TAG"
+          kubectl -n kitten rollout status deployment/kitten-dispatcher --timeout=180s
