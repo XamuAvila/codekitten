@@ -47,6 +47,8 @@ function appErrorToHttp(code: string): number {
       return 400;
     case "NOT_FOUND":
       return 404;
+    case "AUTH_FAILED":
+      return 401;
     case "DUPLICATE":
       return 409;
     case "SERVICE_UNAVAILABLE":
