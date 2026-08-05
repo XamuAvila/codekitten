@@ -50,6 +50,9 @@ importers:
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/express':
         specifier: ^5.0.6
@@ -60,9 +63,6 @@ importers:
       supertest:
         specifier: ^7.2.2
         version: 7.2.2
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
 
   packages/reviewer:
     dependencies:
