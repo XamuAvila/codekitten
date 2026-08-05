@@ -62,6 +62,15 @@ describe("createKnowledgeClient", () => {
     expect(typeof doc.createdAt).toBe("string");
   });
 
+  it("VOYAGE_BASE_URL overrides the embeddings host (MongoDB-provisioned keys)", async () => {
+    const deps = makeDeps();
+    const client = createKnowledgeClient({ ...ENV, VOYAGE_BASE_URL: "https://ai.mongodb.com" }, deps)!;
+
+    await client.insert({ repo: "org/repo", text: "fact", source: "command", author: "a" });
+
+    expect(String(deps.fetchFn.mock.calls[0][0])).toBe("https://ai.mongodb.com/v1/embeddings");
+  });
+
   it("insert caps oversized text", async () => {
     const deps = makeDeps();
     const client = createKnowledgeClient(ENV, deps)!;

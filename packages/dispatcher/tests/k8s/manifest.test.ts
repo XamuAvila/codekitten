@@ -155,6 +155,19 @@ describe("buildPodManifest — semble sidecar (KIT-036)", () => {
     expect(sidecarEnv.get("REPO_PATH")).toBe("/workspace/repo");
   });
 
+  it("reviewer references knowledge secrets including VOYAGE_BASE_URL (all optional)", () => {
+    const pod = buildPodManifest(sampleJob, sampleConfig);
+    const env = pod.spec?.containers[0]?.env ?? [];
+    for (const name of ["MONGODB_URI", "VOYAGE_API_KEY", "VOYAGE_BASE_URL"]) {
+      const entry = env.find((e) => e.name === name);
+      expect(entry?.valueFrom?.secretKeyRef).toEqual({
+        name: "kitten-knowledge-secrets",
+        key: name,
+        optional: true,
+      });
+    }
+  });
+
   it("PVC configured → semble-index volume backed by the PVC", () => {
     const pod = buildPodManifest(sampleJob, sidecarConfig);
     const volume = pod.spec?.volumes?.find((v) => v.name === "semble-index");

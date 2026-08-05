@@ -1,12 +1,13 @@
 ---
 id: "KIT-037"
-status: "in-progress"
+status: "done"
 priority: "high"
 assignee: ""
 epic: "v7-deep-context"
 dueDate: null
 created: "2026-08-05"
 modified: "2026-08-05"
+completedAt: "2026-08-05"
 labels: ["deep-context", "knowledge"]
 order: "e3"
 ---
@@ -52,11 +53,11 @@ memory.
 3. - [x] GREEN: client. PASS.
 4. - [x] RED: dispatcher `webhook-events.test.ts` — `@reviewer remember X` → insert called with source command/author; empty text ignored; no client → ignored + warning; bot ignored (existing filter). FAIL.
 5. - [x] GREEN: command wiring. PASS.
-6. - [ ] Integration (skipped without secrets): real Voyage embed + Atlas roundtrip insert→search.
+6. - [x] Integration (skipped without secrets): real Voyage embed + Atlas roundtrip insert→search. PASSED 2026-08-05 against mongodb-atlas-local (compose `mongo` service, port 27021) + Voyage via https://ai.mongodb.com.
 7. - [x] Commit: `feat: knowledge store (Atlas+Voyage) with @reviewer remember command`
 8. - [x] `pnpm test && pnpm lint` green (unit level).
 
-**BLOCKED on step 6:** integration roundtrip needs real `MONGODB_URI` + `VOYAGE_API_KEY` in `.env` (absent as of 2026-08-05). Suite `packages/shared/tests/knowledge/integration.test.ts` is written and skips without secrets. Card stays in-progress until it runs green against real services.
+**Unblocked 2026-08-05:** the user's Voyage key is MongoDB-provisioned — it only works against `https://ai.mongodb.com`, not `api.voyageai.com` (403 otherwise). `createKnowledgeClient` gained an optional `VOYAGE_BASE_URL` env for this. Local vector search runs on `mongodb/mongodb-atlas-local` (compose service `mongo`, host port 27021, `?directConnection=true`) — plain community mongod has no `$vectorSearch`. Integration suite green against both real services.
 
 ## How to Test
 

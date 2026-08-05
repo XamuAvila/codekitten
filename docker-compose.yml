@@ -14,6 +14,22 @@ services:
       timeout: 3s
       retries: 5
 
+  # Local MongoDB with Atlas Search/Vector Search (mongot) — the knowledge
+  # store's $vectorSearch works here, unlike plain community mongod.
+  # Exposed on 27021 to avoid clashing with other local Mongo containers.
+  mongo:
+    image: mongodb/mongodb-atlas-local:latest
+    restart: unless-stopped
+    ports:
+      - "27021:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   dispatcher:
     build:
       context: .
@@ -23,10 +39,18 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - PORT=3001
-      # Knowledge store (v7) — optional; empty disables with a warning
-      - MONGODB_URI=${MONGODB_URI:-}
+      # Knowledge store (v7) — optional; empty disables with a warning.
+      # Default URI targets the local atlas-local service below.
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/?directConnection=true}
       - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
+      # Keys provisioned via MongoDB Atlas need https://ai.mongodb.com
+      - VOYAGE_BASE_URL=${VOYAGE_BASE_URL:-}
     depends_on:
       redis:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  mongo-data:

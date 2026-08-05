@@ -3,7 +3,15 @@
 // Creates knowledge_vector_index on kitten.knowledge when missing — the index
 // definition mirrors packages/shared/src/knowledge/client.ts (change both).
 // Usage: MONGODB_URI=... node scripts/atlas-bootstrap.mjs
-import { MongoClient } from "mongodb";
+// pnpm strict node_modules: mongodb is a dependency of @kitten/shared, not of
+// the repo root — resolve it from the shared package regardless of cwd.
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+const require = createRequire(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "packages", "shared", "package.json"),
+);
+const { MongoClient } = require("mongodb");
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {

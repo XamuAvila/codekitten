@@ -61,6 +61,12 @@ spec:
                   name: kitten-knowledge-secrets
                   key: VOYAGE_API_KEY
                   optional: true
+            - name: VOYAGE_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kitten-knowledge-secrets
+                  key: VOYAGE_BASE_URL
+                  optional: true
           resources:
             limits:
               memory: "256Mi"

@@ -22,6 +22,7 @@ describeIntegration("Knowledge store real integration (Voyage + Atlas)", () => {
   const client = createKnowledgeClient({
     MONGODB_URI: uri,
     VOYAGE_API_KEY: voyageKey,
+    ...(process.env["VOYAGE_BASE_URL"] ? { VOYAGE_BASE_URL: process.env["VOYAGE_BASE_URL"] } : {}),
   })!;
 
   afterAll(async () => {

@@ -139,6 +139,17 @@ export function buildPodManifest(request: ReviewJob, config: PodConfig): V1Pod {
                 },
               },
             },
+            // Atlas-provisioned Voyage keys need https://ai.mongodb.com
+            {
+              name: "VOYAGE_BASE_URL",
+              valueFrom: {
+                secretKeyRef: {
+                  name: "kitten-knowledge-secrets",
+                  key: "VOYAGE_BASE_URL",
+                  optional: true,
+                },
+              },
+            },
           ],
           resources: {
             requests: {

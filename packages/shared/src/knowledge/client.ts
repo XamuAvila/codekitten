@@ -64,7 +64,12 @@ export interface KnowledgeDeps {
 export const VOYAGE_MODEL = "voyage-code-3";
 export const VOYAGE_DIMENSIONS = 1024;
 export const VECTOR_INDEX_NAME = "knowledge_vector_index";
-const VOYAGE_ENDPOINT = "https://api.voyageai.com/v1/embeddings";
+/**
+ * Default host serves keys created at voyageai.com. Keys provisioned through
+ * MongoDB Atlas ("AI Models" in the Atlas UI) only work against
+ * https://ai.mongodb.com — set VOYAGE_BASE_URL for those (same body/auth).
+ */
+const DEFAULT_VOYAGE_BASE_URL = "https://api.voyageai.com";
 const DB_NAME = "kitten";
 const COLLECTION = "knowledge";
 /** Prompt-growth guard (KIT-039 risk): entries are capped at insert time. */
@@ -77,10 +82,15 @@ const MAX_QUERY_LENGTH = 40_000;
  * callers skip the knowledge pillars with a warning (epic error table).
  */
 export function createKnowledgeClient(
-  env: { readonly MONGODB_URI?: string; readonly VOYAGE_API_KEY?: string },
+  env: {
+    readonly MONGODB_URI?: string;
+    readonly VOYAGE_API_KEY?: string;
+    readonly VOYAGE_BASE_URL?: string;
+  },
   deps?: KnowledgeDeps,
 ): KnowledgeClient | undefined {
   const { MONGODB_URI: uri, VOYAGE_API_KEY: voyageKey } = env;
+  const voyageEndpoint = `${(env.VOYAGE_BASE_URL ?? DEFAULT_VOYAGE_BASE_URL).replace(/\/$/, "")}/v1/embeddings`;
   if (uri === undefined || uri === "" || voyageKey === undefined || voyageKey === "") {
     return undefined;
   }
@@ -97,7 +107,7 @@ export function createKnowledgeClient(
   const embed = async (text: string, inputType: "document" | "query"): Promise<number[]> => {
     let response: Response;
     try {
-      response = await fetchFn(VOYAGE_ENDPOINT, {
+      response = await fetchFn(voyageEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${voyageKey}` },
         body: JSON.stringify({

@@ -101,9 +101,15 @@ success "Secret 'kitten-webhook-secret' applied (value: ${WEBHOOK_SECRET})"
 # (warning at boot) and reviews are unaffected.
 if [[ -n "${MONGODB_URI:-}" && -n "${VOYAGE_API_KEY:-}" ]]; then
   info "Creating kitten-knowledge-secrets from environment..."
+  # VOYAGE_BASE_URL: required for Atlas-provisioned keys (https://ai.mongodb.com).
+  # A MONGODB_URI pointing at localhost is rewritten to host.minikube.internal
+  # so Pods inside minikube can reach a host-local mongo (compose atlas-local).
+  CLUSTER_MONGODB_URI="${MONGODB_URI/localhost/host.minikube.internal}"
+  CLUSTER_MONGODB_URI="${CLUSTER_MONGODB_URI/127.0.0.1/host.minikube.internal}"
   ${K} create secret generic kitten-knowledge-secrets \
-    --from-literal=MONGODB_URI="${MONGODB_URI}" \
+    --from-literal=MONGODB_URI="${CLUSTER_MONGODB_URI}" \
     --from-literal=VOYAGE_API_KEY="${VOYAGE_API_KEY}" \
+    --from-literal=VOYAGE_BASE_URL="${VOYAGE_BASE_URL:-}" \
     -n kitten --dry-run=client -o yaml | ${K} apply -f -
   success "Secret 'kitten-knowledge-secrets' created"
 
