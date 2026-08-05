@@ -184,6 +184,23 @@ describe("runAgenticLoop", () => {
     expect(adapter.explore).not.toHaveBeenCalled();
   });
 
+  it("search results feed back into the next turn's messages (US-024 AC-4)", async () => {
+    const adapter = makeAdapter([
+      { toolUses: [{ name: "search", input: { query: "const a" } }] },
+      { toolUses: [{ name: "report_findings", input: { findings: [] } }] },
+    ]);
+
+    await runAgenticLoop(adapter, PROMPT, DEFAULT_MCP_CONFIG, {
+      registry: makeRegistry(),
+      maxOutputTokens: 8000,
+    });
+
+    const secondTurn = adapter.explore.mock.calls[1][0];
+    const lastMessage = secondTurn.messages[secondTurn.messages.length - 1];
+    expect(JSON.stringify(lastMessage.content)).toContain("a.ts:1");
+    expect(JSON.stringify(lastMessage.content)).toContain("const a = 1;");
+  });
+
   it("counts executed tool calls", async () => {
     const adapter = makeAdapter([
       {

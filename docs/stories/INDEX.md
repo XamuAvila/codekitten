@@ -29,6 +29,6 @@
 | US-021 | Lint Clean: Pre-Existing Errors Fixed | done | v3-llm-integration |
 | US-022 | Dead Comment Code Removed | done | v3-llm-integration |
 | US-023 | Agentic Review Opt-In | done | v4-mcp-agentic-review |
-| US-024 | Repository-Wide Search During Agentic Review | draft | v4-mcp-agentic-review |
+| US-024 | Repository-Wide Search During Agentic Review | done | v4-mcp-agentic-review |
 | US-025 | Related-Code Discovery During Agentic Review | draft | v4-mcp-agentic-review |
 | US-026 | Agentic Cost Control | draft | v4-mcp-agentic-review |
