@@ -201,6 +201,29 @@ describe("runAgenticLoop", () => {
     expect(JSON.stringify(lastMessage.content)).toContain("const a = 1;");
   });
 
+  it("find_related and list_directory results reach the next turn; tool errors don't end the review", async () => {
+    const adapter = makeAdapter([
+      {
+        toolUses: [
+          { name: "list_directory", input: { path: "." } },
+          { name: "find_related", input: { file: "../../escape.ts", line: 1 } },
+        ],
+      },
+      { toolUses: [{ name: "report_findings", input: { findings: [] } }] },
+    ]);
+
+    const result = await runAgenticLoop(adapter, PROMPT, DEFAULT_MCP_CONFIG, {
+      registry: makeRegistry(),
+      maxOutputTokens: 8000,
+    });
+
+    expect(result.findings).toEqual([]);
+    const secondTurn = adapter.explore.mock.calls[1][0];
+    const serialized = JSON.stringify(secondTurn.messages[secondTurn.messages.length - 1].content);
+    expect(serialized).toContain("a.ts");
+    expect(serialized).toContain("VALIDATION");
+  });
+
   it("counts executed tool calls", async () => {
     const adapter = makeAdapter([
       {
