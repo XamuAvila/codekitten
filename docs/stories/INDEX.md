@@ -40,4 +40,4 @@
 | US-032 | Semantic Code Search | done | v7-deep-context |
 | US-033 | Teach the Reviewer Explicitly | ready | v7-deep-context |
 | US-034 | Knowledge-Calibrated Reviews | ready | v7-deep-context |
-| US-035 | Corrections Become Knowledge | ready | v7-deep-context |
+| US-035 | Corrections Become Knowledge | done | v7-deep-context |

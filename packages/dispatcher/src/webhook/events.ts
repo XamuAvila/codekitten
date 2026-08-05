@@ -16,7 +16,16 @@ export interface EventRouterDeps {
   readonly triggerWord: string;
   /** Atlas+Voyage knowledge store (KIT-037) — undefined when unconfigured. */
   readonly knowledgeClient?: KnowledgeClient;
+  /** Fetches a PR review comment by id (KIT-038 root-comment lookup). */
+  readonly getReviewComment?: (
+    repo: string,
+    commentId: number,
+  ) => Promise<{ body: string; user: { login: string; type?: string } } | undefined>;
 }
+
+/** Marker prefix every posted Kitten finding carries (see pipeline comments). */
+const KITTEN_MARKER = "🐱 **Kitten";
+const ROOT_EXCERPT_LENGTH = 300;
 
 const HANDLED_PR_ACTIONS = new Set(["opened", "reopened", "synchronize"]);
 
@@ -54,7 +63,77 @@ export async function routeEvent(
   if (event === "issue_comment") {
     return handleIssueComment(payload, deps);
   }
+  if (event === "pull_request_review_comment") {
+    return handleReviewComment(payload, deps);
+  }
   return { ignored: true };
+}
+
+const ReviewCommentEventSchema = z
+  .object({
+    action: z.string(),
+    comment: z
+      .object({
+        id: z.number().int().positive(),
+        in_reply_to_id: z.number().int().positive().optional(),
+        body: z.string(),
+        user: z.object({ login: z.string().min(1), type: z.string().optional() }).loose(),
+      })
+      .loose(),
+    pull_request: z.object({ number: z.number().int().positive() }).loose(),
+    repository: z.object({ full_name: z.string().min(1) }).loose(),
+  })
+  .loose();
+
+/**
+ * Correction capture (KIT-038, US-035): a HUMAN reply on a finding thread the
+ * reviewer opened becomes knowledge (`source: "correction"`). Cheap filters
+ * first (action/reply/bot), then ONE GitHub API call to check the root
+ * comment carries the Kitten marker. Every human reply on a Kitten thread is
+ * stored — no sentiment parsing in v7 (card decision 2); retrieval similarity
+ * decides relevance at use time.
+ */
+async function handleReviewComment(payload: unknown, deps: EventRouterDeps): Promise<RouteEventResult> {
+  const parsed = ReviewCommentEventSchema.safeParse(payload);
+  if (!parsed.success) {
+    console.warn(
+      `[dispatcher] Malformed pull_request_review_comment payload ignored: ${parsed.error.issues[0]?.path.join(".")}`,
+    );
+    return { ignored: true };
+  }
+
+  const data = parsed.data;
+  if (data.action !== "created") return { ignored: true };
+  if (data.comment.in_reply_to_id === undefined) return { ignored: true }; // top-level, not a reply
+  if (data.comment.user.type === "Bot") return { ignored: true }; // same guard as issue_comment
+
+  if (deps.knowledgeClient === undefined || deps.getReviewComment === undefined) {
+    console.warn("[dispatcher] Correction ignored — knowledge store not configured");
+    return { ignored: true };
+  }
+
+  try {
+    const root = await deps.getReviewComment(data.repository.full_name, data.comment.in_reply_to_id);
+    if (root === undefined || !root.body.startsWith(KITTEN_MARKER)) {
+      return { ignored: true }; // reply on a human thread, not a finding
+    }
+    await deps.knowledgeClient.insert({
+      repo: data.repository.full_name,
+      text: `Finding: ${root.body.slice(0, ROOT_EXCERPT_LENGTH)}\nCorrection: ${data.comment.body}`,
+      source: "correction",
+      author: data.comment.user.login,
+      prNumber: data.pull_request.number,
+    });
+    console.log(
+      `[dispatcher] Correction stored for ${data.repository.full_name}#${data.pull_request.number} by ${data.comment.user.login}`,
+    );
+    return { status: "stored" };
+  } catch (error) {
+    console.warn(
+      `[dispatcher] Correction capture failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return { ignored: true };
+  }
 }
 
 const IssueCommentEventSchema = z

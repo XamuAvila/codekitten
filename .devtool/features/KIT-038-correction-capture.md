@@ -1,12 +1,13 @@
 ---
 id: "KIT-038"
-status: "backlog"
+status: "done"
 priority: "medium"
 assignee: ""
 epic: "v7-deep-context"
 dueDate: null
 created: "2026-08-05"
 modified: "2026-08-05"
+completedAt: "2026-08-05"
 labels: ["deep-context", "knowledge", "webhook"]
 order: "e4"
 ---
@@ -38,14 +39,16 @@ See [US-035](../../docs/stories/US-035-corrections-become-knowledge.md).
 2. Every human reply on a finding thread is stored (no sentiment parsing in v7) — retrieval similarity + the LLM decide relevance at use time; over-capture is cheaper than NLP-filtering wrongly.
 3. Marker check on the root comment prevents capturing replies on human threads.
 
+**Execution note:** root lookup implemented with plain `fetch` + `GITHUB_TOKEN` in `server.ts` (`fetchReviewComment`), injected as `EventRouterDeps.getReviewComment` — no Octokit dep added to the dispatcher (tests mock the injected function, same coverage). GitHub webhook must also subscribe to the "Pull request review comments" event (documented in AGENTS.md at KIT-040).
+
 **Risks:** GitHub API call per reply adds latency/quota — one call, only for replies that pass the cheap filters first.
 
 ## Implementation Plan
 
-1. - [ ] RED: `webhook-events.test.ts` — human reply on a Kitten root → insert with `source: "correction"` and combined text; reply on human thread → ignored; bot reply → ignored; non-reply → ignored; no client → warning + 200. FAIL.
-2. - [ ] GREEN: event branch + root lookup (mocked Octokit). PASS.
-3. - [ ] Commit: `feat(dispatcher): capture human corrections on findings as knowledge`
-4. - [ ] `pnpm test && pnpm lint` green.
+1. - [x] RED: `webhook-events.test.ts` — human reply on a Kitten root → insert with `source: "correction"` and combined text; reply on human thread → ignored; bot reply → ignored; non-reply → ignored; no client → warning + 200. FAIL.
+2. - [x] GREEN: event branch + root lookup (mocked Octokit). PASS.
+3. - [x] Commit: `feat(dispatcher): capture human corrections on findings as knowledge`
+4. - [x] `pnpm test && pnpm lint` green.
 
 ## How to Test
 

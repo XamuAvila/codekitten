@@ -55,6 +55,7 @@ export function createApp(config: AppConfig): express.Express {
           podConfig: config.podConfig,
           triggerWord: config.triggerWord ?? "@reviewer",
           ...(knowledgeClient !== undefined ? { knowledgeClient } : {}),
+          getReviewComment: fetchReviewComment,
         }),
     }),
   );
@@ -63,4 +64,31 @@ export function createApp(config: AppConfig): express.Express {
   app.use(errorHandler);
 
   return app;
+}
+
+/**
+ * GET /repos/{repo}/pulls/comments/{id} — root-comment lookup for correction
+ * capture (KIT-038). 404 → undefined (thread root deleted); other failures
+ * throw and are contained by the caller.
+ */
+async function fetchReviewComment(
+  repo: string,
+  commentId: number,
+): Promise<{ body: string; user: { login: string; type?: string } } | undefined> {
+  const token = process.env.GITHUB_TOKEN;
+  const response = await fetch(`https://api.github.com/repos/${repo}/pulls/comments/${commentId}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (response.status === 404) return undefined;
+  if (!response.ok) {
+    throw new Error(`GitHub review-comment lookup failed: HTTP ${response.status}`);
+  }
+  const data = (await response.json()) as { body?: string; user?: { login?: string; type?: string } };
+  return {
+    body: data.body ?? "",
+    user: { login: data.user?.login ?? "unknown", ...(data.user?.type ? { type: data.user.type } : {}) },
+  };
 }

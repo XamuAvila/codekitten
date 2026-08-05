@@ -271,4 +271,111 @@ describe("routeEvent — pull_request", () => {
       });
     });
   });
+
+  describe("pull_request_review_comment — correction capture (KIT-038)", () => {
+    let insert: ReturnType<typeof vi.fn>;
+    let getReviewComment: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      insert = vi.fn().mockResolvedValue(undefined);
+      getReviewComment = vi.fn().mockResolvedValue({
+        body: "🐱 **Kitten**: possible null deref in auth.ts line 10",
+        user: { login: "kitten[bot]", type: "Bot" },
+      });
+      deps = { ...deps, knowledgeClient: { insert } as never, getReviewComment };
+    });
+
+    function reviewCommentPayload(overrides?: Record<string, unknown>) {
+      return {
+        action: "created",
+        comment: {
+          id: 999,
+          in_reply_to_id: 111,
+          body: "this is intentional, stop flagging it",
+          user: { login: "human-dev", type: "User" },
+        },
+        pull_request: { number: 42 },
+        repository: { full_name: "octo/repo" },
+        ...overrides,
+      };
+    }
+
+    it("human reply on a Kitten finding thread → stored as correction with combined text", async () => {
+      const result = await routeEvent("pull_request_review_comment", reviewCommentPayload(), deps);
+
+      expect(getReviewComment).toHaveBeenCalledWith("octo/repo", 111);
+      const doc = insert.mock.calls[0][0];
+      expect(doc.source).toBe("correction");
+      expect(doc.repo).toBe("octo/repo");
+      expect(doc.author).toBe("human-dev");
+      expect(doc.prNumber).toBe(42);
+      expect(doc.text).toContain("Finding:");
+      expect(doc.text).toContain("possible null deref");
+      expect(doc.text).toContain("Correction: this is intentional, stop flagging it");
+      expect(result.status).toBe("stored");
+    });
+
+    it("reply on a human-authored thread (no Kitten marker) → ignored", async () => {
+      getReviewComment.mockResolvedValue({
+        body: "I think this could be simpler",
+        user: { login: "other-dev", type: "User" },
+      });
+
+      const result = await routeEvent("pull_request_review_comment", reviewCommentPayload(), deps);
+
+      expect(insert).not.toHaveBeenCalled();
+      expect(result).toEqual({ ignored: true });
+    });
+
+    it("bot reply → ignored without fetching the root", async () => {
+      const payload = reviewCommentPayload({
+        comment: {
+          id: 999,
+          in_reply_to_id: 111,
+          body: "🐱 **Kitten**: follow-up",
+          user: { login: "kitten[bot]", type: "Bot" },
+        },
+      });
+
+      const result = await routeEvent("pull_request_review_comment", payload, deps);
+
+      expect(getReviewComment).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+      expect(result).toEqual({ ignored: true });
+    });
+
+    it("top-level comment (no in_reply_to_id) → ignored", async () => {
+      const payload = reviewCommentPayload({
+        comment: { id: 999, body: "standalone note", user: { login: "human-dev", type: "User" } },
+      });
+
+      const result = await routeEvent("pull_request_review_comment", payload, deps);
+
+      expect(getReviewComment).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+      expect(result).toEqual({ ignored: true });
+    });
+
+    it("no knowledge client → ignored with warning", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      deps = { ...deps, knowledgeClient: undefined };
+
+      const result = await routeEvent("pull_request_review_comment", reviewCommentPayload(), deps);
+
+      expect(result).toEqual({ ignored: true });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("knowledge"));
+      warn.mockRestore();
+    });
+
+    it("root lookup failure → ignored with warning, delivery acknowledged", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      getReviewComment.mockRejectedValue(new Error("github 500"));
+
+      const result = await routeEvent("pull_request_review_comment", reviewCommentPayload(), deps);
+
+      expect(insert).not.toHaveBeenCalled();
+      expect(result).toEqual({ ignored: true });
+      warn.mockRestore();
+    });
+  });
 });
