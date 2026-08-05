@@ -174,6 +174,9 @@ export function buildPodManifest(request: ReviewJob, config: PodConfig): V1Pod {
                 env: [
                   { name: "REPO_PATH", value: WORKSPACE_CLONE_DIR },
                   { name: "SEMBLE_CACHE_LOCATION", value: indexPath },
+                  // Embedding model cache on the PVC — without this every Pod
+                  // re-downloads the model and the first search times out.
+                  { name: "HF_HOME", value: "/semble-index/.hf-cache" },
                   { name: "PORT", value: String(SEMBLE_SIDECAR_PORT) },
                 ],
                 volumeMounts: [

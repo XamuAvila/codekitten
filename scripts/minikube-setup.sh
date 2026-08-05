@@ -146,7 +146,9 @@ minikube image build -t kitten-reviewer:latest -f "${PROJECT_ROOT}/packages/revi
 success "Reviewer image built"
 
 info "Building semble sidecar image inside minikube..."
-minikube image build -t kitten-semble-sidecar:latest -f "${PROJECT_ROOT}/docker/semble-sidecar/Dockerfile" "${PROJECT_ROOT}/docker/semble-sidecar"
+# No -f: minikube image build mishandles -f with a non-root context; the
+# Dockerfile sits at the context root anyway.
+minikube image build -t kitten-semble-sidecar:latest "${PROJECT_ROOT}/docker/semble-sidecar"
 success "Semble sidecar image built"
 
 # ─── 8. Apply dispatcher deployment + service ───────────────────────────────

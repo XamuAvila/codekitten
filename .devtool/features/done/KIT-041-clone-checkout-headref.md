@@ -1,11 +1,12 @@
 ---
 id: "KIT-041"
-status: "in-progress"
+status: "done"
 priority: "high"
 epic: "v7-deep-context"
 dueDate: null
 created: "2026-08-05"
 modified: "2026-08-05"
+completedAt: "2026-08-05"
 labels: ["bug", "git"]
 order: "e7"
 ---
@@ -37,7 +38,7 @@ all refs; only HEAD checkout changes) and correct the docstring.
    present in the worktree. FAIL against current code.
 2. - [x] GREEN: `--branch` arg + docstring fix.
 3. - [x] Commit: `fix(reviewer): check out the PR head branch on clone`
-4. - [ ] Re-run deep-context e2e — step 2 (agentic tool call) passes.
+4. - [x] Re-run deep-context e2e — step 2 (agentic tool call) passes (2026-08-05).
 
 ## How to Test
 

@@ -1,7 +1,7 @@
 ---
 id: v7-deep-context
 title: "v7: Deep Context"
-status: active
+status: done
 created: "2026-08-05"
 ---
 
@@ -13,6 +13,11 @@ created: "2026-08-05"
 > embeddings) fed by explicit `@reviewer remember` commands and human
 > corrections on findings — retrieved as few-shot examples that calibrate
 > every following review.
+
+> Closed 2026-08-05. All six planned cards plus KIT-041 (bug found by the
+> e2e: clone never checked out the PR head) shipped; deep-context e2e green
+> on minikube against real Voyage + vector-search Mongo. Known deviations
+> from the original plan are recorded in each card's execution notes.
 
 ## Problem
 
@@ -75,6 +80,7 @@ Execution order (sequential):
 | [KIT-038](../features/KIT-038-correction-capture.md) | [US-035](../../docs/stories/US-035-corrections-become-knowledge.md) | `pull_request_review_comment` webhook → corrections stored |
 | [KIT-039](../features/KIT-039-knowledge-few-shot.md) | [US-034](../../docs/stories/US-034-knowledge-calibrated-reviews.md) | vector retrieval + "Repository knowledge" prompt block in both paths |
 | [KIT-040](../features/KIT-040-deep-context-e2e.md) | [US-034](../../docs/stories/US-034-knowledge-calibrated-reviews.md) | e2e (minikube + Atlas), docs, invariant amendment, epic close gate |
+| [KIT-041](../features/KIT-041-clone-checkout-headref.md) | bug found during KIT-040 | clone checks out the PR head branch (config/tools read the head, not the base) |
 
 ## Architecture
 

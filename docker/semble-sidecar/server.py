@@ -140,6 +140,15 @@ async def main() -> None:
         _session = session
         print(f"[semble-sidecar] semble MCP ready, serving on :{PORT}")
 
+        # Warm-up: build the index (and download the embedding model on the
+        # very first run) before the reviewer needs it — the agentic loop's
+        # 10s tool timeout is far shorter than a cold model download.
+        try:
+            await session.call_tool("search", {"query": "warmup", "repo": REPO_PATH, "top_k": 1})
+            print("[semble-sidecar] index warm")
+        except Exception as error:
+            print(f"[semble-sidecar] warmup failed (non-fatal): {error}", file=sys.stderr)
+
         app = web.Application()
         app.router.add_get("/health", handle_health)
         app.router.add_post("/search", handle_search)

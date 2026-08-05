@@ -1,12 +1,13 @@
 ---
 id: "KIT-040"
-status: "in-progress"
+status: "done"
 priority: "medium"
 assignee: ""
 epic: "v7-deep-context"
 dueDate: null
 created: "2026-08-05"
 modified: "2026-08-05"
+completedAt: "2026-08-05"
 labels: ["deep-context", "e2e", "docs"]
 order: "e6"
 ---
@@ -34,11 +35,15 @@ See [US-034](../../docs/stories/US-034-knowledge-calibrated-reviews.md) (AC-3) �
 ## Implementation Plan
 
 1. - [x] `deep-context-e2e.sh` + setup seeding + Atlas index bootstrap.
-2. - [ ] Run on minikube with real secrets — all four assertions pass. **BLOCKED: MONGODB_URI + VOYAGE_API_KEY absent from .env (2026-08-05). Negative path verified: script skips loudly, exit 0.**
+2. - [x] Run on minikube with real secrets — all four assertions PASSED (2026-08-05, mongodb-atlas-local via compose + Voyage via ai.mongodb.com). Negative path also verified earlier: script skips loudly without secrets, exit 0.
 3. - [x] AGENTS.md: invariant amendment + setup + feature docs.
-4. - [ ] Docs-alignment sweep; fix divergences in the same commit.
-5. - [ ] Commit: `feat: deep-context e2e, docs, and job-isolation amendment`
-6. - [ ] `pnpm test && pnpm lint` green; epic → done.
+4. - [x] Docs-alignment sweep; fix divergences in the same commit.
+5. - [x] Commit: `feat: deep-context e2e, docs, and job-isolation amendment`
+6. - [x] `pnpm test && pnpm lint` green; epic → done.
+
+**Execution notes (2026-08-05):**
+- E2e surfaced and closed three real defects before the epic could close: KIT-041 (clone never checked out headRef), stale minikube image builds (dispatcher/reviewer rebuilt; `minikube image build -f` bug worked around for the sidecar), and cold-start index/model download (fixed with `HF_HOME` on the PVC + a warmup search at sidecar boot).
+- Local knowledge stack: compose `mongo` service (`mongodb/mongodb-atlas-local`, port 27021) + `VOYAGE_BASE_URL=https://ai.mongodb.com` for MongoDB-provisioned Voyage keys.
 
 ## How to Test
 
