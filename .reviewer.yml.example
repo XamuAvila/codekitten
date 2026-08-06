@@ -1,14 +1,31 @@
-# Sample .reviewer.yml — copy to the reviewed repo's root as .reviewer.yml
+# Sample .reviewer.yml — copy to the reviewed repo's root as .reviewer.yml.
+# Every key is optional; anything omitted falls back to the default.
+# Full reference: docs/configuration.md
+#
+# The schema is STRICT: an unknown key makes the file invalid, and an invalid
+# file is silently ignored (the review then runs on defaults). Validate changes.
 reviewer:
+  # provider selects the SDK; base_url selects which API key env var is read.
+  provider: anthropic
+  base_url: https://api.deepseek.com/anthropic
   language: en
-  model: claude-sonnet-5
-  max_tokens: 200000
+  model: deepseek-v4-flash
+  # Prompt budget (chunking threshold) and per-request output cap.
+  max_context_tokens: 1000000
+  max_output_tokens: 16000
+  max_findings: 20
+  max_complexity: 10
   trigger: "@reviewer"
-  blocking: comment_only
+  blocking: comment_only # comment_only | request_changes
   skip:
     - "**/Migrations/**"
     - "*.Designer.cs"
     - "**/*.snap"
     - "**/node_modules/**"
   conventions_file: CLAUDE.md
-  rules: [] # custom rules are v2+
+  knowledge_top_k: 5
+  # Repository-specific review criteria. A finding caused by one of these
+  # carries its id; ids not declared here are stripped from findings.
+  rules:
+    - id: no-raw-sql
+      description: Database access must go through the repository layer, never raw SQL.
