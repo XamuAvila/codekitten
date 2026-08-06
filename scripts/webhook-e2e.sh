@@ -28,7 +28,10 @@ JOB_ID="review-xamuavila-kitten-test-repo-2"
 POLL_TIMEOUT=120
 POLL_INTERVAL=3
 
-kubectl() { command kubectl --context=minikube "$@"; }
+# Pin the context — never operate against whatever cluster happens to be current.
+# Default is minikube (dev loop); export KUBE_CONTEXT=<eks-context> to target EKS (v9).
+KUBE_CONTEXT="${KUBE_CONTEXT:-minikube}"
+kubectl() { command kubectl --context="$KUBE_CONTEXT" "$@"; }
 
 DISPATCHER_URL="${DISPATCHER_URL:-$(minikube service kitten-dispatcher -n kitten --url 2>/dev/null)}"
 WEBHOOK_SECRET="${WEBHOOK_SECRET:-$(kubectl get secret kitten-webhook-secret -n kitten -o jsonpath='{.data.secret}' | base64 -d)}"

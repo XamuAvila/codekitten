@@ -9,8 +9,10 @@ set -euo pipefail
 NAMESPACE="${K8S_NAMESPACE:-kitten}"
 
 # Pin the context — this script deletes Pods; never let it hit a cluster the
-# developer merely happens to have selected.
-kubectl() { command kubectl --context=minikube "$@"; }
+# developer merely happens to have selected. Default is minikube (dev loop);
+# export KUBE_CONTEXT=<eks-context> to target an EKS cluster (v9).
+KUBE_CONTEXT="${KUBE_CONTEXT:-minikube}"
+kubectl() { command kubectl --context="$KUBE_CONTEXT" "$@"; }
 
 echo "Cleaning up kitten-reviewer Pods in namespace: $NAMESPACE"
 

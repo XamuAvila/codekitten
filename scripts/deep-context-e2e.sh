@@ -25,7 +25,10 @@ pass() { echo -e "${GREEN}✓ $1${NC}"; }
 fail() { echo -e "${RED}✗ $1${NC}"; exit 1; }
 info() { echo -e "${YELLOW}→ $1${NC}"; }
 
-kubectl() { command kubectl --context=minikube "$@"; }
+# Pin the context — never operate against whatever cluster happens to be current.
+# Default is minikube (dev loop); export KUBE_CONTEXT=<eks-context> to target EKS (v9).
+KUBE_CONTEXT="${KUBE_CONTEXT:-minikube}"
+kubectl() { command kubectl --context="$KUBE_CONTEXT" "$@"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES="${SCRIPT_DIR}/fixtures/webhook"

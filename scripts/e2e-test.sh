@@ -30,7 +30,9 @@ POLL_INTERVAL=3
 POLL_TIMEOUT=120
 
 # Pin the context — never operate against whatever cluster happens to be current.
-kubectl() { command kubectl --context=minikube "$@"; }
+# Default is minikube (dev loop); export KUBE_CONTEXT=<eks-context> to target EKS (v9).
+KUBE_CONTEXT="${KUBE_CONTEXT:-minikube}"
+kubectl() { command kubectl --context="$KUBE_CONTEXT" "$@"; }
 
 # --- Step 1: Verify cluster is ready ---
 info "Checking cluster health..."

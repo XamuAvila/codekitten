@@ -1,0 +1,40 @@
+# RBAC for the GitHub Actions deploy role (v9). The IAM role created by
+# scripts/eks-setup.sh is mapped into this group via:
+#   eksctl create iamidentitymapping --arn <role> --group kitten-ci-deploy
+#
+# ClusterRole (not Role): the deploy applies a Namespace object, which is
+# cluster-scoped. Secret/configmap access is read-only — Secrets are owned by
+# scripts/eks-setup.sh, never by the CI.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kitten-ci-deploy
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods", "services", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kitten-ci-deploy
+subjects:
+  - kind: Group
+    name: kitten-ci-deploy
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: kitten-ci-deploy
+  apiGroup: rbac.authorization.k8s.io

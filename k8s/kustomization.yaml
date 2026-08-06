@@ -1,0 +1,20 @@
+# Kitten Kustomization — non-secret resources only (v9).
+#
+# `kubectl apply -k k8s` is the canonical "apply all infra" command used by
+# scripts/eks-setup.sh and .github/workflows/deploy.yml.
+#
+# k8s/secret.yaml is deliberately NOT listed: it is a REPLACE_ME placeholder
+# applied only by the setup scripts, which overwrite it with the real Secrets
+# created from exported env vars. Including it here would let the CI clobber
+# the live Secrets with the placeholder on every deploy.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - dispatcher-deployment.yaml
+  - dispatcher-service.yaml
+  - redis-deployment.yaml
+  - redis-service.yaml
+  - semble-index-pvc.yaml
