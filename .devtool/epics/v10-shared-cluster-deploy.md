@@ -167,6 +167,18 @@ export interface PodConfig {
 
 ## Implementation Cards
 
+**Prerequisite — KIT-050 (epic v9).** The overlay resolves `resources:
+[../../k8s]`, which requires `k8s/kustomization.yaml`. That file is KIT-050's
+deliverable, not v10's.
+
+This dependency was not respected on the first pass: `deploy/shared-cluster/`
+and `deploy.yml` were committed while `k8s/kustomization.yaml` stayed
+untracked, so a clean checkout could render neither — US-042 AC-1 was false on
+`master` even though the epic was marked done. Fixed by committing and closing
+KIT-050. Anyone reordering or re-running this epic must land KIT-050 first, and
+must verify the overlay from a **clean checkout** (`git archive HEAD`), not
+from a working tree where untracked files paper over the gap.
+
 Execution order (sequential — KIT-053 documents the variable KIT-052 introduces):
 
 | Card | Story | Scope |
