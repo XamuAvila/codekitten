@@ -229,3 +229,31 @@ IDLE_TIMEOUT=30 ./scripts/e2e-test.sh
 **Always pass `--context=minikube` to `kubectl`.** The scripts do this internally;
 do it by hand too. A developer kubeconfig may point at a production cluster, and
 these commands create namespaces, RBAC and Secrets.
+
+### AWS EKS (v9)
+
+Production-style deploy. The cluster must exist (eksctl/Terraform); everything
+inside it is bootstrapped once and then deployed by CI on every push to the deploy
+branch (`master` by default, via `DEPLOY_BRANCH`):
+
+```bash
+# One-time bootstrap (prereqs: aws, eksctl, kubectl, admin kubeconfig)
+EKS_CLUSTER=<name> EKS_REGION=<region> GITHUB_REPO=<owner/repo> \
+  GITHUB_TOKEN=<token> ANTHROPIC_API_KEY=<key> DEEPSEEK_API_KEY=<key> \
+  ./scripts/eks-setup.sh
+```
+
+`eks-setup.sh` is idempotent: OIDC provider → deploy IAM role (OIDC trust for
+`refs/heads/${DEPLOY_BRANCH}` of `GITHUB_REPO`, ECR push + `eks:DescribeCluster`) → aws-auth
+mapping to group `kitten-ci-deploy` + `k8s/eks-deploy-rbac.yaml` → base infra
+(`kubectl apply -k k8s`) → real Secrets → ECR repos. It prints the
+`AWS_ROLE_ARN` to store as a GitHub Secret, plus the `AWS_REGION`/`EKS_CLUSTER`
+GitHub Variables.
+
+Deploys: `.github/workflows/deploy.yml` (push to `master`) builds the three
+images, pushes them to ECR tagged `${GITHUB_SHA}`, applies `kubectl apply -k
+k8s`, and points the dispatcher at the ECR images with `kubectl set image` /
+`kubectl set env`. `k8s/secret.yaml` is NOT in `k8s/kustomization.yaml` — the
+CI must never overwrite the live Secrets. Operator scripts default to the
+`minikube` context; use `KUBE_CONTEXT=<eks-context>` for EKS.
+
